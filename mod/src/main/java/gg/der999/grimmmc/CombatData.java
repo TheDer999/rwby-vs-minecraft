@@ -35,7 +35,7 @@ final class CombatData {
 		int comboType, chargeType;
 		boolean increaseCombo, resetCombo, uninterruptible;
 		/** Animation clip names: windup, primary, secondary. */
-		String clipWindup, clipPrimary, clipSecondary;
+		String clipWindup, clipPrimary, clipSecondary, clipLoopStart, clipLoop, clipLoopEnd;
 		final Attack[] attacks = new Attack[3]; // primary, secondary, tertiary
 	}
 
@@ -77,6 +77,9 @@ final class CombatData {
 			a.clipWindup = str(an, "WindupAnimation");
 			a.clipPrimary = str(an, "PrimaryAnimation");
 			a.clipSecondary = str(an, "SecondaryAnimation");
+			a.clipLoopStart = str(an, "LoopStartAnimation");
+			a.clipLoop = str(an, "LoopAnimation");
+			a.clipLoopEnd = str(an, "LoopEndAnimation");
 			JsonObject at = o.getAsJsonObject("attacks");
 			String[] slots = {"primary", "secondary", "tertiary"};
 			for (int i = 0; i < 3; i++) {

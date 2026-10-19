@@ -153,6 +153,8 @@ public class GrimmMcClient implements ClientModInitializer {
 			if (AUTO && client.player != null && client.world != null) {
 				if (AUTO_MODE.equals("possess")) autoPossess(client);
 				else if (AUTO_MODE.equals("combat")) autoCombat(client);
+				else if (AUTO_MODE.equals("media")) autoMedia(client);
+				else if (AUTO_MODE.equals("fight")) autoFight(client);
 				else if (AUTO_MODE.equals("placed")) autoStep(client);
 			}
 			if (place != null) while (place.wasPressed()) placeRuby(client);
@@ -268,7 +270,7 @@ public class GrimmMcClient implements ClientModInitializer {
 	public static volatile boolean counterPressed;
 	/** Set by MinecraftClientMixin when the pick-item button (middle click) is pressed while Ruby is possessed. */
 	public static volatile boolean specialPressed;
-	static boolean prevHeavy;
+	static boolean prevHeavy, prevCtrl;
 
 	static void handleCombatInput(MinecraftClient client) {
 		if (combat == null) return;
@@ -283,6 +285,11 @@ public class GrimmMcClient implements ClientModInitializer {
 		prevHeavy = heavy;
 		boolean shoot = inGame && client.options.dropKey.isPressed();
 		if (shoot) combat.press(CombatController.Action.RANGED);
+		boolean ctrl = inGame && client.options.sprintKey.isPressed();
+		boolean still = !client.options.forwardKey.isPressed() && !client.options.backKey.isPressed()
+			&& !client.options.leftKey.isPressed() && !client.options.rightKey.isPressed();
+		if (ctrl && !prevCtrl && still) combat.press(CombatController.Action.TEAM);
+		prevCtrl = ctrl;
 		if (specialPressed) {
 			specialPressed = false;
 			if (inGame) combat.press(CombatController.Action.SPECIAL);
@@ -490,6 +497,82 @@ public class GrimmMcClient implements ClientModInitializer {
 		if (autoTicks == 505) client.scheduleStop();
 	}
 
+	/** Listing screenshots: possess Ruby, fight a few still mobs, and take pictures at the interesting moments. */
+	static void autoMedia(MinecraftClient client) {
+		autoTicks++;
+		int n = autoTicks;
+		if (n >= 90 && n < 400) {
+			client.player.setYaw(0f);
+			client.player.setPitch(12f);
+		}
+		if (n == 100) togglePossess(client);
+		var net = client.player.networkHandler;
+		if (n == 108 && net != null) net.sendChatCommand("summon minecraft:husk ~ ~ ~3.2 {NoAI:1b,Silent:1b,PersistenceRequired:1b}");
+		if (n == 109 && net != null) net.sendChatCommand("summon minecraft:zombie ~-2.2 ~ ~3.6 {NoAI:1b,Silent:1b,PersistenceRequired:1b}");
+		if (n == 110 && net != null) net.sendChatCommand("summon minecraft:skeleton ~2.4 ~ ~3.8 {NoAI:1b,Silent:1b,PersistenceRequired:1b}");
+		if (n == 125) shoot(client);
+		int[] clicks = {130, 141, 152, 163};
+		for (int i = 0; i < clicks.length; i++) {
+			if (n == clicks[i]) client.options.attackKey.setPressed(true);
+			if (n == clicks[i] + 1) client.options.attackKey.setPressed(false);
+			if (n == clicks[i] + 3) shoot(client);
+		}
+		if (n == 200) client.options.useKey.setPressed(true);
+		if (n == 209) shoot(client);
+		if (n == 216) client.options.useKey.setPressed(false);
+		if (n == 224) shoot(client);
+		if (n == 232 && net != null) net.sendChatCommand("summon minecraft:husk ~ ~ ~2.6 {NoAI:1b,Silent:1b,PersistenceRequired:1b}");
+		if (n == 240) RubyStats.addHits(24);
+		if (n == 246) specialPressed = true;
+		if (n == 251) shoot(client);
+		if (n == 255) shoot(client);
+		if (n == 285) client.options.dropKey.setPressed(true);
+		if (n == 288) client.options.dropKey.setPressed(false);
+		if (n == 290) shoot(client);
+		if (n == 300) client.scheduleStop();
+	}
+	static String lastFightClip;
+
+	/** Counter and Reap self test: a husk that really attacks, F pressed until a counter lands, then Ctrl for Reap on a still zombie. */
+	static void autoFight(MinecraftClient client) {
+		autoTicks++;
+		int n = autoTicks;
+		if (n >= 90 && n < 400) {
+			client.player.setYaw(0f);
+			client.player.setPitch(12f);
+		}
+		var net = client.player.networkHandler;
+		if (n == 100) togglePossess(client);
+		if (n == 104 && net != null) net.sendChatCommand("gamemode survival");
+		if (n == 108 && net != null) net.sendChatCommand("summon minecraft:husk ~ ~ ~4 {Silent:1b,PersistenceRequired:1b}");
+		CombatController cc = combat;
+		String clip = cc != null && cc.active() ? cc.clipName() : null;
+		if (cc != null && !java.util.Objects.equals(clip, lastFightClip)) {
+			lastFightClip = clip;
+			LOG.info("FIGHT-TEST tick {} clip={} aura={} {}", n, clip, Math.round(RubyStats.shield()), fightMobs(client));
+		}
+		if (n >= 125 && n < 260 && n % 4 == 0) counterPressed = true;
+		if (n == 262) logTargets(client, "after counter spam");
+		if (n == 268 && net != null) net.sendChatCommand("kill @e[type=minecraft:husk]");
+		if (n == 272 && net != null) net.sendChatCommand("summon minecraft:zombie ~ ~ ~4.5 {NoAI:1b,Silent:1b,PersistenceRequired:1b}");
+		if (n == 285) logTargets(client, "before reap");
+		if (n == 286) client.options.sprintKey.setPressed(true);
+		if (n == 288) client.options.sprintKey.setPressed(false);
+		if (n == 292 || n == 298 || n == 306) shoot(client);
+		if (n == 325) logTargets(client, "after reap");
+		if (n == 335) client.scheduleStop();
+	}
+
+	static String fightMobs(MinecraftClient client) {
+		StringBuilder sb = new StringBuilder();
+		for (net.minecraft.entity.Entity e : client.world.getEntities()) {
+			if (e instanceof net.minecraft.entity.mob.HuskEntity || e instanceof net.minecraft.entity.mob.ZombieEntity) {
+				var le = (net.minecraft.entity.LivingEntity) e;
+				sb.append(String.format("[%s hp=%.1f d=%.1f]", e.getType().getUntranslatedName(), le.getHealth(), Math.hypot(e.getX() - client.player.getX(), e.getZ() - client.player.getZ())));
+			}
+		}
+		return sb.toString();
+	}
 	static void logTargets(MinecraftClient client, String label) {
 		for (net.minecraft.entity.Entity e : client.world.getEntities()) {
 			if (e instanceof net.minecraft.entity.mob.Monster && e instanceof net.minecraft.entity.LivingEntity le) {

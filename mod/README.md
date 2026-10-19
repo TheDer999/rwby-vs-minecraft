@@ -31,12 +31,13 @@ Grimm Eclipse's PC controls and move timings (singleplayer only; hostile mobs ar
 | Q (hold) | Ranged shot (Crescent Rose hitscan, 3rd shot in a combo is a heavier one) |
 | F | Counter an enemy that is attacking you; with nothing to counter she plays the failed-counter animation |
 | Middle click | Special: Crescendo, once the Special bar is full (24 landed hits) |
+| Ctrl (tap, standing still) | Reap: warps to a nearby enemy (within 9 blocks), spins three hits and a smashing finish. Grimm Eclipse's team attack, here as a solo move |
 | WASD / Space | Move and jump; locked while a move is playing, as in Grimm Eclipse |
 
 Moves auto-target the best enemy in front of you (Grimm Eclipse's scoring), turn toward it and stop short of it. Damage, knockback and launch use
 Grimm Eclipse's numbers through `damage_scale` (default 0.15) and `knockback_scale` (default 0.35) in `config.properties`.
 The HUD (top left) shows Aura (4,000, soaks damage before your health; recharges after 3 s, 5 s if emptied), Health (1,000 = 20 hearts) and Special.
-Not ported: Reap (team attack), taunt, the upgraded Crescendo variants' selection, sound, effects.
+Sound and effects use Minecraft's own sounds and particles (rose petals are red dust); Grimm Eclipse's own audio and effects are not used. Not ported: taunt, the upgraded Crescendo variants' selection, sniper form.
 
 **Developer keys** (only with `debug=true` in `config.properties`): `[` places Ruby, `,` / `.` browse all 46 clips.
 ## How it works

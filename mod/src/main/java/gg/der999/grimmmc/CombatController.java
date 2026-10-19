@@ -30,6 +30,8 @@ public final class CombatController {
 	private static final double TARGET_MIN_SCORE = 0.3;
 	/** A forward push stops once the target is this close (GE: 1 unit). */
 	private static final double PUSH_STOP_DISTANCE = 1.3;
+	/** How far the team attack (Reap) reaches: Ruby warps to the enemy, so it stays inside what the server accepts as one move. */
+	static final double TEAM_RANGE = 9.0;
 
 	final CombatData data;
 
@@ -152,6 +154,19 @@ public final class CombatController {
 			}
 		}
 
+		// The team attack (Reap) interrupts like the counter does, but needs an enemy close enough to warp to.
+		if (queued == Action.TEAM) {
+			queued = Action.NONE;
+			if (!uninterruptible) {
+				CombatData.Ability reap = data.role("TeamAttack", 0);
+				if (phase != Phase.IDLE) cancel(grounded);
+				if (reap != null) {
+					start(client, reap, true, TEAM_RANGE);
+					if (target == null) cancel(grounded);
+				}
+			}
+		}
+
 		// Dispatch a buffered input when Ruby is idle, in a combo window, or free to act after a dodge.
 		if (queued != Action.NONE && (phase == Phase.IDLE || phase == Phase.WINDOW || actionFree)) {
 			Action a = queued;
@@ -166,8 +181,10 @@ public final class CombatController {
 
 		// Hold the heavy button to charge; releasing (or reaching the maximum) swings.
 		if (phase == Phase.CHARGE) {
+			float before = chargeTime;
 			chargeTime += DT;
 			clipTime += DT;
+			if (before < move.ability.fullCharge && chargeTime >= move.ability.fullCharge) Fx.chargeComplete(p.getPos());
 			if (!heavyHeld || chargeTime >= move.ability.maxCharge - 1e-4f) {
 				boolean full = chargeTime >= move.ability.fullCharge - 1e-4f;
 				Move m = Moves.heavy(move.ability, full);
@@ -272,6 +289,10 @@ public final class CombatController {
 	}
 
 	private boolean start(MinecraftClient client, CombatData.Ability ability, boolean autotarget) {
+		return start(client, ability, autotarget, ability == null || ability.comboType != 1 ? TARGET_DISTANCE : 40.0);
+	}
+
+	private boolean start(MinecraftClient client, CombatData.Ability ability, boolean autotarget, double range) {
 		if (ability == null) return false;
 		ClientPlayerEntity p = client.player;
 		Move m = Moves.build(ability, p.isOnGround());
@@ -282,7 +303,7 @@ public final class CombatController {
 		Vec3d desired = desiredDirection(client, aim);
 		Entity previous = target;
 		boolean ranged = ability.comboType == 1;
-		target = autotarget ? selectTarget(client, desired != null ? yawOf(desired) : aim, desired != null, previous, ranged ? 40.0 : TARGET_DISTANCE, ranged ? 45.0 : TARGET_ANGLE_CUTOFF) : null;
+		target = autotarget ? selectTarget(client, desired != null ? yawOf(desired) : aim, desired != null, previous, range, ranged ? 45.0 : TARGET_ANGLE_CUTOFF) : null;
 		if (counterTarget != null) {
 			target = counterTarget;
 			counterTarget = null;
@@ -309,6 +330,7 @@ public final class CombatController {
 		gravityActive = true; // GE: gravity is 0 at the start of every ability
 		gravity = 0f;
 		gravitySpeed = 1f;
+		Fx.started(ability.coroutine, p.getPos());
 		return true;
 	}
 
@@ -393,9 +415,10 @@ public final class CombatController {
 		Entity best = null;
 		double bestDist = 8.5;
 		for (Entity e : client.world.getOtherEntities(p, p.getBoundingBox().expand(8.5), HitService::isTarget)) {
-			boolean attacking = e instanceof net.minecraft.entity.mob.MobEntity m
-				&& (m.isAttacking() || m.handSwinging) && m.getTarget() != null;
+			// The server's target is not known to the client, so an enemy that is in attack mode (or swinging) close by counts.
 			double d = Math.hypot(e.getX() - p.getX(), e.getZ() - p.getZ());
+			boolean attacking = e instanceof net.minecraft.entity.mob.MobEntity m
+				&& ((m.isAttacking() && d <= 5.0) || (m.handSwinging && d <= 6.0));
 			if (attacking && d < bestDist) {
 				best = e;
 				bestDist = d;
@@ -431,16 +454,33 @@ public final class CombatController {
 		p.setPosition(target.getX() + away.x * 1.5, target.getY(), target.getZ() + away.z * 1.5);
 		p.setVelocity(0, 0, 0);
 		facingYaw = yawTo(p, target);
+		Fx.warp(p.getPos());
 	}
 
 	void strikeTarget() {
-		CombatData.Attack atk = move == null ? null : move.ability.attacks[0];
-		if (atk != null) HitService.strike(MinecraftClient.getInstance(), this, target, atk.hit);
+		strikeSlot(0);
+		Fx.sound(net.minecraft.sound.SoundEvents.ITEM_SHIELD_BLOCK, 0.9f, 1.2f);
+	}
+
+	/** Direct damage to the current target with one of the move's attacks (Counter and Reap hit their target, not a volume). */
+	void strikeSlot(int slot) {
+		CombatData.Attack atk = move == null ? null : move.ability.attacks[slot];
+		if (atk == null || atk.hit == null || target == null || !target.isAlive()) return;
+		HitService.strike(MinecraftClient.getInstance(), this, target, atk.hit);
+		Fx.swipe(facingYaw, atk.hit.damage);
+	}
+
+	/** The smashing finish of Reap. */
+	void smash(int slot) {
+		strikeSlot(slot);
+		ClientPlayerEntity p = MinecraftClient.getInstance().player;
+		if (p != null) Fx.smash(p.getPos());
 	}
 
 	void shoot(int slot) {
 		CombatData.Attack atk = move == null ? null : move.ability.attacks[slot];
 		if (atk != null) HitService.shoot(MinecraftClient.getInstance(), this, atk.hit, target);
+		Fx.shot();
 	}
 
 	/** The third shot: GE fires a projectile whose damage lives in a prefab, so this is three bullets' worth. */
@@ -453,6 +493,7 @@ public final class CombatController {
 		h.knockBack = atk.hit.knockBack * 3f;
 		h.hitTime = atk.hit.hitTime;
 		HitService.shoot(MinecraftClient.getInstance(), this, h, target);
+		Fx.shot();
 	}
 
 	void push(float speed) {
@@ -523,6 +564,7 @@ public final class CombatController {
 		CombatData.Attack atk = move == null ? null : move.ability.attacks[slot];
 		MinecraftClient client = MinecraftClient.getInstance();
 		HitService.hit(client, this, atk);
+		if (atk != null && atk.hit != null) Fx.swipe(facingYaw, atk.hit.damage);
 	}
 
 	// ---- physics
@@ -545,6 +587,7 @@ public final class CombatController {
 				&& Math.hypot(target.getX() - p.getX(), target.getZ() - p.getZ()) <= PUSH_STOP_DISTANCE;
 			if (!blocked) {
 				smoothPushSpeed += (pushSpeed - smoothPushSpeed) * Math.min(1f, 15f * DT);
+				if (smoothPushSpeed >= 20f && visible) Fx.petals(p.getPos(), 3);
 				float yaw = facingYaw * MathHelper.RADIANS_PER_DEGREE;
 				double perTick = smoothPushSpeed / 20.0;
 				vx = -MathHelper.sin(yaw) * perTick;

@@ -13,14 +13,14 @@ Play Ruby from *RWBY: Grimm Eclipse* inside Minecraft: Java Edition (Fabric 1.21
 | `melty-recipe.json` | The install recipe used on Melty |
 
 ## Controls (singleplayer, press O to become Ruby)
-Left click light combo, hold right click heavy, Shift dodge, Q ranged, F counter, middle click special once the Special bar is full.
+Left click light combo, hold right click heavy, Shift dodge, Q ranged, F counter, middle click special once the Special bar is full, Ctrl (standing still next to an enemy) Reap.
 
 ## Building
 - Mod: JDK 21, Gradle 8.12, Fabric Loom 1.9, Yarn 1.21.4+build.8, Fabric API 0.119.4+1.21.4 (`gradle build` in `mod/`). Build from a short path on Windows.
 - Converter: .NET 8 SDK, `dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true` in `converter/`.
 
 ## Status
-Version 0.2.0: light, heavy, ranged, counter, dodge and the Crescendo special, auto-targeting, aura/health/special meters. Not yet: sound and effects, team attacks, taunt, multiplayer.
+Version 0.3.0: light, heavy, ranged, counter, dodge, the Crescendo special and Reap, auto-targeting, aura/health/special meters, and sounds and effects built from Minecraft's own. Not yet: Grimm Eclipse's own audio, taunt, multiplayer.
 
 ## Credits and licence
 Made by Der999 with AI assistance (Claude, by Anthropic, through Claude Code). Source code: MIT, see `LICENSE`. RWBY and RWBY: Grimm Eclipse belong to their rights holders; this is an unofficial fan project, not affiliated with them. The move timings and numbers in `Moves.java` were ported by reading how the game behaves.

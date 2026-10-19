@@ -149,6 +149,18 @@ final class Moves {
 				return m.at(t0 + 0.1f, c -> c.hit(0)).at(t0 + 0.2f, c -> c.hit(0)).at(t0 + 0.3f, c -> c.hit(1)).end(t0 + 0.4f);
 			}
 
+			// ---- Reap (Ctrl, standing still): Grimm Eclipse's team attack, here as a solo finisher on one nearby enemy
+			case "Reap":
+				return new Move(a, a.clipLoopStart)
+					.at(0f, c -> { c.invuln(1.4f); c.setVisible(false); c.warpToTarget(); })
+					.at(0.05f, c -> { c.setVisible(true); c.gravity(25f, 0.3f); c.push(5f); c.setClip(a.clipLoop); })
+					.at(0.10f, c -> c.strikeSlot(0))
+					.at(0.30f, c -> c.strikeSlot(0))
+					.at(0.50f, c -> c.strikeSlot(0))
+					.at(0.70f, c -> { c.setClip(a.clipLoopEnd); c.gravitySpeed(1f); })
+					.at(0.75f, c -> { c.gravity(15f, 1f); c.push(-15f); c.scalePush(-15f, 0f, 0.2f); c.smash(1); })
+					.end(0.95f);
+
 			// ---- counter (F)
 			case "Counter":
 				return new Move(a, clip)
