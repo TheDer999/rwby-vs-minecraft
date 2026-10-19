@@ -1,0 +1,155 @@
+package gg.der999.grimmmc;
+
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.mob.Monster;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.particle.ParticleTypes;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.hit.HitResult;
+import net.minecraft.util.math.Box;
+import net.minecraft.world.RaycastContext;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.world.World;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+/**
+ * Applies Ruby's attacks to Minecraft mobs. Grimm Eclipse resolves a hit as "everything overlapping a sphere in front of
+ * her"; this does the same on the client, then applies damage, knockback and launch on the integrated server's thread
+ * (so it works in single player only, which is all this mod supports).
+ */
+final class HitService {
+	private HitService() {}
+
+	/** Which entities Ruby's attacks hurt: hostile mobs (Grimm Eclipse's Grimm are her only enemies). */
+	static boolean isTarget(Entity e) {
+		return e instanceof LivingEntity && e instanceof Monster && e.isAlive() && !e.isRemoved();
+	}
+
+	static void hit(MinecraftClient client, CombatController combat, CombatData.Attack atk) {
+		if (atk == null || atk.hit == null || !atk.hasVolume) return;
+		PlayerEntity p = client.player;
+		if (p == null || client.world == null) return;
+		float yawRad = combat.facingYaw() * MathHelper.RADIANS_PER_DEGREE;
+		Vec3d fwd = new Vec3d(-MathHelper.sin(yawRad), 0, MathHelper.cos(yawRad));
+		Vec3d right = new Vec3d(-MathHelper.cos(yawRad), 0, -MathHelper.sin(yawRad));
+		float s = CombatController.SCALE;
+		Vec3d center = p.getPos()
+			.add(right.multiply(atk.offset[0] * s))
+			.add(0, atk.offset[1] * s, 0)
+			.add(fwd.multiply(atk.offset[2] * s));
+		double radius = atk.radius * s;
+
+		List<UUID> targets = new ArrayList<>();
+		Box search = new Box(center, center).expand(radius);
+		for (Entity e : client.world.getOtherEntities(p, search, HitService::isTarget)) {
+			Box b = e.getBoundingBox();
+			double dx = MathHelper.clamp(center.x, b.minX, b.maxX) - center.x;
+			double dy = MathHelper.clamp(center.y, b.minY, b.maxY) - center.y;
+			double dz = MathHelper.clamp(center.z, b.minZ, b.maxZ) - center.z;
+			if (dx * dx + dy * dy + dz * dz <= radius * radius) targets.add(e.getUuid());
+		}
+		deliver(client, p, targets, fwd, atk.hit);
+	}
+
+	/** A ranged hit: a hitscan along the aim line (target centre, or where Ruby looks), stopped by blocks. */
+	static void shoot(MinecraftClient client, CombatController combat, CombatData.Hit h, Entity aim) {
+		PlayerEntity p = client.player;
+		if (p == null || client.world == null || h == null) return;
+		Vec3d eye = p.getEyePos().subtract(0, 0.25, 0);
+		float yaw = combat.facingYaw() * MathHelper.RADIANS_PER_DEGREE, pitch = p.getPitch() * MathHelper.RADIANS_PER_DEGREE;
+		Vec3d dir = aim != null && aim.isAlive()
+			? aim.getBoundingBox().getCenter().subtract(eye).normalize()
+			: new Vec3d(-MathHelper.sin(yaw) * MathHelper.cos(pitch), -MathHelper.sin(pitch), MathHelper.cos(yaw) * MathHelper.cos(pitch));
+		Vec3d end = eye.add(dir.multiply(60));
+		BlockHitResult block = client.world.raycast(new RaycastContext(eye, end, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, p));
+		if (block.getType() != HitResult.Type.MISS) end = block.getPos();
+		Entity best = null;
+		Vec3d bestPoint = end;
+		double bestDist = Double.MAX_VALUE;
+		for (Entity e : client.world.getOtherEntities(p, new Box(eye, end).expand(1.0), HitService::isTarget)) {
+			java.util.Optional<Vec3d> point = e.getBoundingBox().expand(0.3).raycast(eye, end);
+			if (point.isEmpty()) continue;
+			double d = eye.squaredDistanceTo(point.get());
+			if (d < bestDist) { bestDist = d; best = e; bestPoint = point.get(); }
+		}
+		Vec3d tip = best != null ? bestPoint : end;
+		double len = tip.distanceTo(eye);
+		for (double s = 0.8; s < len; s += 0.8) {
+			Vec3d at = eye.add(dir.multiply(s));
+			client.world.addParticle(ParticleTypes.CRIT, at.x, at.y, at.z, 0, 0, 0);
+		}
+		if (best != null) {
+			List<UUID> one = new ArrayList<>();
+			one.add(best.getUuid());
+			deliver(client, p, one, dir.multiply(1, 0, 1).normalize(), h);
+		}
+	}
+
+	/** Hits one entity directly (the counter strike). */
+	static void strike(MinecraftClient client, CombatController combat, Entity target, CombatData.Hit h) {
+		PlayerEntity p = client.player;
+		if (p == null || target == null || h == null) return;
+		float yaw = combat.facingYaw() * MathHelper.RADIANS_PER_DEGREE;
+		List<UUID> one = new ArrayList<>();
+		one.add(target.getUuid());
+		deliver(client, p, one, new Vec3d(-MathHelper.sin(yaw), 0, MathHelper.cos(yaw)), h);
+	}
+
+	private static void deliver(MinecraftClient client, PlayerEntity p, List<UUID> targets, Vec3d fwd, CombatData.Hit h) {
+		if (targets.isEmpty()) return;
+		MinecraftServer server = client.getServer();
+		if (server == null) return; // not single player: nothing to hit with
+		float damage = h.damage * GrimmMcClient.CONFIG.damageScale;
+		UUID playerId = p.getUuid();
+		RegistryKey<World> dim = client.world.getRegistryKey();
+		Vec3d origin = p.getPos();
+		GrimmMcClient.hitsLanded += targets.size();
+		RubyStats.addHits(targets.size());
+		server.execute(() -> apply(server, dim, playerId, targets, origin, fwd, damage, h));
+	}
+
+	private static void apply(MinecraftServer server, RegistryKey<World> dim, UUID playerId, List<UUID> targets,
+			Vec3d origin, Vec3d fwd, float damage, CombatData.Hit h) {
+		ServerWorld world = server.getWorld(dim);
+		ServerPlayerEntity player = server.getPlayerManager().getPlayer(playerId);
+		if (world == null || player == null) return;
+		for (UUID id : targets) {
+			Entity e = world.getEntity(id);
+			if (!(e instanceof LivingEntity target) || !target.isAlive()) continue;
+			target.timeUntilRegen = 0; // Grimm Eclipse has no hit immunity between hits
+			target.damage(world, world.getDamageSources().playerAttack(player), Math.max(damage, 0.01f));
+
+			// Knockback: Grimm Eclipse pushes for hitTime seconds at knockBack units per second. Negative pulls the target in.
+			Vec3d away = new Vec3d(target.getX() - origin.x, 0, target.getZ() - origin.z);
+			away = away.lengthSquared() < 1e-6 ? fwd : away.normalize();
+			double distance = h.knockBack * h.hitTime * GrimmMcClient.CONFIG.knockbackScale;
+			double horizontal = distance * 0.45; // ground friction in Minecraft spreads a velocity over about 2.2 ticks of travel
+			Vec3d v = target.getVelocity();
+			double vy = v.y;
+			if (h.knockUp > 0f) {
+				double apex = CombatController.knockUpApex(h.knockUp) * GrimmMcClient.CONFIG.knockbackScale;
+				vy = Math.max(vy, Math.sqrt(0.16 * apex) * 1.05);
+			}
+			target.setVelocity(away.x * horizontal, vy, away.z * horizontal);
+			target.velocityModified = true;
+
+			world.spawnParticles(h.damage >= 100f ? ParticleTypes.CRIT : ParticleTypes.ENCHANTED_HIT,
+				target.getX(), target.getBodyY(0.6), target.getZ(), h.damage >= 100f ? 12 : 4, 0.25, 0.25, 0.25, 0.1);
+		}
+		world.playSound(null, player.getBlockPos(),
+			damage >= 1f ? SoundEvents.ENTITY_PLAYER_ATTACK_STRONG : SoundEvents.ENTITY_PLAYER_ATTACK_SWEEP,
+			SoundCategory.PLAYERS, 0.8f, 1.0f);
+	}
+}

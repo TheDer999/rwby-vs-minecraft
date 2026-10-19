@@ -1,0 +1,13 @@
+{
+	"key.grimmmc.place": "Place Ruby",
+	"key.grimmmc.possess": "Become Ruby (toggle)",
+	"key.grimmmc.light": "Light combo",
+	"key.grimmmc.heavy": "Heavy combo",
+	"key.grimmmc.run": "Run (toggle)",
+	"key.grimmmc.walk": "Walk (toggle)",
+	"key.grimmmc.jump": "Jump",
+	"key.grimmmc.dash": "Dash attack",
+	"key.grimmmc.prev": "Previous clip",
+	"key.grimmmc.next": "Next clip",
+	"category.grimmmc": "Grimm Eclipse in Minecraft"
+}

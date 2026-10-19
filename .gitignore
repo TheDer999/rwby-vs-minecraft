@@ -1,0 +1,9 @@
+build/
+.gradle/
+run/
+bin/
+obj/
+*.png
+*.zip
+*.jar
+*.exe

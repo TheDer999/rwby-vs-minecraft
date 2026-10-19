@@ -1,0 +1,83 @@
+package gg.der999.grimmmc;
+
+import java.io.IOException;
+import java.io.Reader;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Properties;
+
+/**
+ * Where the converted Grimm Eclipse data lives and how to (re)create it.
+ * <p>Melty writes %LOCALAPPDATA%\GrimmMC\config.properties before every Play with:
+ * ge_dir (the player's Grimm Eclipse folder), converter (GrimmConvert.exe) and data_dir. Values use forward slashes.
+ * <p>For development the folder can be moved with the GRIMMMC_HOME environment variable.
+ */
+final class GrimmConfig {
+	final Path home;
+	final Path dataDir;
+	/** The player's Grimm Eclipse folder, or null when not configured. */
+	final String geDir;
+	/** Path of GrimmConvert.exe, or null when not configured. */
+	final Path converter;
+	/**
+	 * Minecraft damage per point of Grimm Eclipse damage. A Beowolf has 2,000 health and a zombie 20, so 0.01 would keep
+	 * Grimm Eclipse's exact ratios but takes dozens of combos per zombie; the default 0.15 makes a light combo cost a
+	 * zombie about a third of its health. Lower it for a harder game (config key damage_scale).
+	 */
+	final float damageScale;
+	/** Scales Grimm Eclipse's knockback and launch distances to Minecraft (config key knockback_scale). */
+	final float knockbackScale;
+	/** Enables the developer keys (animation browser, placed Ruby) (config key debug=true). */
+	final boolean debug;
+
+	private GrimmConfig(Path home, Path dataDir, String geDir, Path converter, float damageScale, float knockbackScale, boolean debug) {
+		this.home = home;
+		this.dataDir = dataDir;
+		this.geDir = geDir;
+		this.converter = converter;
+		this.damageScale = damageScale;
+		this.knockbackScale = knockbackScale;
+		this.debug = debug;
+	}
+
+	private static float number(Properties p, String key, float fallback) {
+		try {
+			String v = p.getProperty(key);
+			return v == null || v.isBlank() ? fallback : Float.parseFloat(v.trim());
+		} catch (NumberFormatException e) {
+			return fallback;
+		}
+	}
+
+	static GrimmConfig load() {
+		String env = System.getenv("GRIMMMC_HOME");
+		Path home;
+		if (env != null && !env.isBlank()) {
+			home = Path.of(env);
+		} else {
+			String local = System.getenv("LOCALAPPDATA");
+			if (local == null || local.isBlank()) local = System.getProperty("user.home") + "/AppData/Local";
+			home = Path.of(local).resolve("GrimmMC");
+		}
+		Properties p = new Properties();
+		Path file = home.resolve("config.properties");
+		if (Files.isRegularFile(file)) {
+			try (Reader r = Files.newBufferedReader(file)) {
+				p.load(r);
+			} catch (IOException e) {
+				GrimmMcClient.LOG.error("Could not read {}", file, e);
+			}
+		}
+		String data = p.getProperty("data_dir");
+		String converter = p.getProperty("converter");
+		String ge = p.getProperty("ge_dir");
+		return new GrimmConfig(
+			home,
+			data == null || data.isBlank() ? home.resolve("data") : Path.of(data.trim()),
+			ge == null || ge.isBlank() ? null : ge.trim(),
+			converter == null || converter.isBlank() ? null : Path.of(converter.trim()),
+			number(p, "damage_scale", 0.15f),
+			number(p, "knockback_scale", 0.35f),
+			"true".equalsIgnoreCase(p.getProperty("debug", "false").trim()));
+	}
+}

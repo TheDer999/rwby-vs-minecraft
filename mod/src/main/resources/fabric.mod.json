@@ -1,0 +1,20 @@
+{
+	"schemaVersion": 1,
+	"id": "grimmmc",
+	"version": "${version}",
+	"name": "Grimm Eclipse in Minecraft",
+	"description": "Ruby from RWBY: Grimm Eclipse, built from the player's own copy of the game. Ships no game assets.",
+	"authors": ["Der999"],
+	"license": "MIT",
+	"environment": "client",
+	"mixins": ["grimmmc.mixins.json"],
+	"entrypoints": {
+		"client": ["gg.der999.grimmmc.GrimmMcClient"]
+	},
+	"depends": {
+		"fabricloader": ">=0.16.0",
+		"minecraft": "~1.21.4",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}

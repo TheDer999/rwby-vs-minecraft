@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "mode": "installed",
+  "games": [
+    {"role": "primary", "slug": "minecraft-java"},
+    {"role": "secondary", "slug": "custom-rwby-grimm-eclipse"}
+  ],
+  "components": [{"id": "main", "kind": "main", "label": "Grimm Eclipse in Minecraft (Prism Launcher with the GrimmMC instance)", "fileName": "GrimmMC-0.2.0.zip", "required": true}],
+  "requirements": [],
+  "mappings": [{"component": "main", "from": "", "to": "{localappdata}/GrimmMC"}],
+  "setup": {
+    "label": "Minecraft",
+    "launch": {"kind": "exe", "path": "{localappdata}/GrimmMC/Prism/prismlauncher.exe", "args": ["--launch", "GrimmMC"]},
+    "done": {"file": "{localappdata}/GrimmMC/Prism/instances/GrimmMC/.minecraft/logs/latest.log", "contains": "Backend library:"}
+  },
+  "launch": {"kind": "exe", "path": "{localappdata}/GrimmMC/Prism/prismlauncher.exe", "args": ["--launch", "GrimmMC"]},
+  "settings": [{"file": "{localappdata}/GrimmMC/config.properties",
+    "set": {"ge_dir": "{game:custom-rwby-grimm-eclipse}",
+            "converter": "{localappdata}/GrimmMC/converter/GrimmConvert.exe",
+            "data_dir": "{localappdata}/GrimmMC/data"}}],
+  "runtimeData": ["{localappdata}/GrimmMC"],
+  "test": {"checks": ["data-ready", "rig-loaded", "ruby-rendered", "possess-moves", "attack-played"], "minutes": 8},
+  "notes": {
+    "beforeInstall": "Needs your own RWBY: Grimm Eclipse from Steam (app 418340) and a Minecraft: Java Edition account.",
+    "firstLaunch": "Minecraft is set up first (a few minutes), then the first start converts your Grimm Eclipse data (about a minute, progress shows on the title screen). In a world, press O to become Ruby."
+  }
+}
