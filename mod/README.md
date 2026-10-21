@@ -32,7 +32,7 @@ Grimm Eclipse's PC controls and move timings (singleplayer only; hostile mobs ar
 | F | Counter a hostile mob that is about to strike (within about 3 blocks and in attack mode or swinging, or a skeleton drawing its bow); with nothing to counter she plays the failed-counter animation |
 | Middle click | Special: Crescendo, once the Special bar is full (24 landed hits) |
 | Ctrl (tap, standing still) | Reap: warps to a nearby enemy (within 9 blocks), spins three hits and a smashing finish. Grimm Eclipse's team attack, here as a solo move |
-| WASD / Space | Move and jump; locked while a move is playing, as in Grimm Eclipse |
+| WASD / Space | Move and jump (Ruby jumps 3 blocks high, set with `jump_height`); locked while a move is playing, as in Grimm Eclipse |
 
 Moves auto-target the best enemy in front of you (Grimm Eclipse's scoring), turn toward it and stop short of it. Damage, knockback and launch use
 Grimm Eclipse's numbers (every hit that pushes at all moves its victim at least two thirds of a block, so light combos shove enemies back) through `damage_scale` (default 0.15) and `knockback_scale` (default 0.35) in `config.properties`.

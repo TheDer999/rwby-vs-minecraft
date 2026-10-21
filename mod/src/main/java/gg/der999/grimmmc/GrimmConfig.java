@@ -38,12 +38,14 @@ final class GrimmConfig {
 	final boolean geSounds;
 	/** Volume of those sounds before Minecraft's own volume sliders (config key sound_volume, default 1). */
 	final float soundVolume;
+	/** How high Ruby jumps in blocks (config key jump_height; vanilla is 1.25, Grimm Eclipse's movement is far more airy). */
+	final float jumpHeight;
 	/** Seconds the aura takes to refill once it starts recharging (config key aura_recharge_seconds; Grimm Eclipse uses 2). */
 	final float auraRechargeSeconds;
 	/** Enables the developer keys (animation browser, placed Ruby) (config key debug=true). */
 	final boolean debug;
 
-	private GrimmConfig(Path home, Path dataDir, String geDir, Path converter, float damageScale, float knockbackScale, boolean hitAllMobs, float auraMax, float auraRechargeSeconds, boolean geSounds, float soundVolume, boolean debug) {
+	private GrimmConfig(Path home, Path dataDir, String geDir, Path converter, float damageScale, float knockbackScale, boolean hitAllMobs, float auraMax, float auraRechargeSeconds, boolean geSounds, float soundVolume, float jumpHeight, boolean debug) {
 		this.home = home;
 		this.dataDir = dataDir;
 		this.geDir = geDir;
@@ -54,6 +56,7 @@ final class GrimmConfig {
 		this.auraMax = auraMax;
 		this.geSounds = geSounds;
 		this.soundVolume = soundVolume;
+		this.jumpHeight = jumpHeight;
 		this.auraRechargeSeconds = auraRechargeSeconds;
 		this.debug = debug;
 	}
@@ -101,6 +104,7 @@ final class GrimmConfig {
 			number(p, "aura_recharge_seconds", 8f),
 			!"false".equalsIgnoreCase(p.getProperty("ge_sounds", "true").trim()),
 			Math.max(0f, number(p, "sound_volume", 1f)),
+			Math.max(1f, Math.min(8f, number(p, "jump_height", 3f))),
 			"true".equalsIgnoreCase(p.getProperty("debug", "false").trim()));
 	}
 }

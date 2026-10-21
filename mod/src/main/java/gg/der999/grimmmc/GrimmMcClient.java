@@ -166,6 +166,7 @@ public class GrimmMcClient implements ClientModInitializer {
 				client.player.setInvisible(true); // hide the vanilla model; re-asserted every tick
 				handleCombatInput(client);
 				RubyStats.tick(CombatController.DT);
+				applyJumpBoost(client, true);
 				if (combat == null || !combat.showsClip()) updateLocomotion(client);
 			}
 
@@ -260,6 +261,8 @@ public class GrimmMcClient implements ClientModInitializer {
 			possessedPlayer = null;
 			client.player.setInvisible(false);
 			client.options.setPerspective(savedPerspective);
+			applyJumpBoost(client, false);
+			applySprintBoost(client, false);
 			tell(client, "Ruby released.");
 		}
 	}
@@ -323,6 +326,33 @@ public class GrimmMcClient implements ClientModInitializer {
 	 * Grimm Eclipse's dodge button is also its sprint button, in any direction. Minecraft's own sprint only works forwards,
 	 * so while Shift is held and Ruby moves sideways or back on the ground, her speed is raised to sprint speed here.
 	 */
+	static final net.minecraft.util.Identifier JUMP_BOOST_ID = net.minecraft.util.Identifier.of("grimmmc", "jump_boost");
+
+	/**
+	 * Ruby jumps jump_height blocks (default 3) instead of Minecraft's 1.25, to match how far her moves carry her. The extra
+	 * jump strength is a modifier that exists only while she is possessed. Jump height grows with the square of the take-off
+	 * speed, so the speed is scaled by the square root of the wanted height over the vanilla one.
+	 */
+	static void applyJumpBoost(MinecraftClient client, boolean on) {
+		var p = client.player;
+		if (p == null) return;
+		var attr = p.getAttributeInstance(net.minecraft.entity.attribute.EntityAttributes.JUMP_STRENGTH);
+		if (attr == null) return;
+		boolean has = attr.hasModifier(JUMP_BOOST_ID);
+		if (!on) {
+			if (has) attr.removeModifier(JUMP_BOOST_ID);
+			return;
+		}
+		double factor = Math.sqrt((CONFIG.jumpHeight + 0.45) / 1.25) - 1.0; // +0.45: so a full 3-block wall is cleared, not just reached
+		if (has) {
+			var m = attr.getModifier(JUMP_BOOST_ID);
+			if (m != null && Math.abs(m.value() - factor) < 1e-6) return;
+			attr.removeModifier(JUMP_BOOST_ID);
+		}
+		attr.addTemporaryModifier(new net.minecraft.entity.attribute.EntityAttributeModifier(JUMP_BOOST_ID, factor,
+			net.minecraft.entity.attribute.EntityAttributeModifier.Operation.ADD_MULTIPLIED_BASE));
+	}
+
 	static final net.minecraft.util.Identifier SPRINT_BOOST_ID = net.minecraft.util.Identifier.of("grimmmc", "sprint_boost");
 
 	static void applySprintBoost(MinecraftClient client, boolean shiftHeld) {
@@ -632,7 +662,7 @@ public class GrimmMcClient implements ClientModInitializer {
 		}
 		return sb.toString();
 	}
-	static double moveX0, moveZ0, moveY0;
+	static double moveX0, moveZ0, moveY0, jumpMax;
 
 	/** Movement self test: sideways walking with and without Shift, aimed shots, then swimming (sink, dive, surface). */
 	static void autoMove(MinecraftClient client) {
@@ -644,6 +674,11 @@ public class GrimmMcClient implements ClientModInitializer {
 		if (n >= 90 && n < 800 && n != 0) { if (n < 330 || n > 400) { p.setYaw(0f); } }
 		if (n == 100) togglePossess(client);
 		if (n == 104 && net != null) net.sendChatCommand("gamemode survival");
+		// jump height: press jump once and record how high Ruby gets
+		if (n == 106) { moveY0 = p.getY(); jumpMax = moveY0; o.jumpKey.setPressed(true); }
+		if (n == 108) o.jumpKey.setPressed(false);
+		if (n > 106 && n < 150) jumpMax = Math.max(jumpMax, p.getY());
+		if (n == 150) LOG.info("MOVE-TEST jump: peak {} blocks above the ground (jump_height={})", String.format("%.2f", jumpMax - moveY0), CONFIG.jumpHeight);
 		// walking left: plain, then with Shift
 		if (n == 120) { moveX0 = p.getX(); moveZ0 = p.getZ(); o.leftKey.setPressed(true); }
 		if (n == 140) { LOG.info("MOVE-TEST left only: {} blocks in 20 ticks", String.format("%.2f", Math.hypot(p.getX() - moveX0, p.getZ() - moveZ0))); o.leftKey.setPressed(false); }
