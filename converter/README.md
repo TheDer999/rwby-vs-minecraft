@@ -41,3 +41,6 @@ Conversion takes about 37 s. Not tested: an unrecognised build, a damaged instal
 `dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true`
 produces a 33.6 MB `GrimmConvert.exe`; ship it with `classdata.tpk` beside it.
 Build from a short path: the scratch folder path is too long for Windows.
+
+## Sounds
+The converter also exports Ruby's sound effects and voice lines (AudioClips named ruby_*, Ruby - * and weap_crescentrose_*) as sound_*.wav. It cuts each FMOD FSB5 clip out of the game's resource file and decodes it with vgmstream-cli (ISC licence, https://github.com/vgmstream/vgmstream, release r2117, the vgmstream-win64.zip build, SHA-256 6c4a8a3813864fefed081bbd337dbc0ad93bf88e0b92f5db98d7ab258b22dc6c), which must sit in a gmstream folder beside GrimmConvert.exe. The decoder is not stored in this repository; download that release and unpack it there. Without it the sounds are skipped and the rest of the conversion still works.

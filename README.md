@@ -20,7 +20,7 @@ Left click light combo, hold right click heavy, Shift dodge, Q ranged, F counter
 - Converter: .NET 8 SDK, `dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true` in `converter/`.
 
 ## Status
-Version 0.7.0: light, heavy, ranged, counter, dodge, the Crescendo special and Reap, auto-targeting, aura/health/special meters, sounds and effects built from Minecraft's own, aimed ranged shots, sprint in any direction and swimming. Not yet: Grimm Eclipse's own audio, taunt, multiplayer.
+Version 0.8.0: light, heavy, ranged, counter, dodge, the Crescendo special and Reap, auto-targeting, aura/health/special meters, sounds and effects built from Minecraft's own, aimed ranged shots, sprint in any direction and swimming. Ruby's own sounds and voice lines are converted from your install (vgmstream decoder, fetched at build time, see converter/README.md). Not yet: Grimm Eclipse's visual effects and hit-impact sounds, taunt, multiplayer.
 
 ## Credits and licence
 Made by Der999 with AI assistance (Claude, by Anthropic, through Claude Code). Source code: MIT, see `LICENSE`. RWBY and RWBY: Grimm Eclipse belong to their rights holders; this is an unofficial fan project, not affiliated with them. The move timings and numbers in `Moves.java` were ported by reading how the game behaves.

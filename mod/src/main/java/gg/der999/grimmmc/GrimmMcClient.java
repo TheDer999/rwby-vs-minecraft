@@ -344,7 +344,11 @@ public class GrimmMcClient implements ClientModInitializer {
 	}
 	/** Damage left for the player's health after Ruby's aura soaked its share (read on the integrated server's thread). */
 	public static float auraAbsorb(UUID id, float amount) {
-		return possessed && id.equals(possessedPlayer) ? RubyStats.absorb(amount) : amount;
+		if (possessed && id.equals(possessedPlayer)) {
+			if (amount > 0f) MinecraftClient.getInstance().execute(Sounds::hurt);
+			return RubyStats.absorb(amount);
+		}
+		return amount;
 	}
 
 	/** True when the given player is inside a dodge and must take no damage (read on the integrated server's thread). */
@@ -682,7 +686,7 @@ public class GrimmMcClient implements ClientModInitializer {
 			}
 		}
 		CombatController c = combat;
-		LOG.info("COMBAT-TEST {}: hitsLanded={} combatActive={} clip={} aura={} special={} hp={}", label, hitsLanded, c != null && c.active(), c == null ? null : c.clipName(), Math.round(RubyStats.shield()), String.format("%.2f", RubyStats.specialFill()), client.player.getHealth());
+		LOG.info("COMBAT-TEST {}: sounds started={} failed={} hitsLanded={} combatActive={} clip={} aura={} special={} hp={}", label, Sounds.STARTED.get(), Sounds.FAILED.get(), hitsLanded, c != null && c.active(), c == null ? null : c.clipName(), Math.round(RubyStats.shield()), String.format("%.2f", RubyStats.specialFill()), client.player.getHealth());
 	}
 
 	static void shoot(MinecraftClient client) {
@@ -725,6 +729,8 @@ public class GrimmMcClient implements ClientModInitializer {
 				combatData = CombatData.load(dir.resolve("ruby_combat.json"));
 				LOG.info("Loaded Ruby combat data: {} abilities", combatData.abilities.size());
 			}
+			// Grimm Eclipse's own sounds are optional too (older data, or a failed sound conversion).
+			Sounds.load(dir);
 			// Crescent Rose is optional: Ruby still renders without it.
 			if (weapon == null && Files.exists(dir.resolve("crescent_rose.json"))) {
 				weapon = Prop.load(dir.resolve("crescent_rose.json"), rig);

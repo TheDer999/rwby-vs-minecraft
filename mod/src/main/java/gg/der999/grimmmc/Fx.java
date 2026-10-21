@@ -21,6 +21,7 @@ final class Fx {
 	private static final DustParticleEffect PETAL_DARK = new DustParticleEffect(0x5A0F18, 1.0f);
 
 	static void sound(SoundEvent e, float volume, float pitch) {
+		if (Sounds.active()) return; // Ruby's own sounds play instead
 		MinecraftClient c = MinecraftClient.getInstance();
 		ClientPlayerEntity p = c.player;
 		if (p == null || c.world == null) return;
@@ -84,11 +85,13 @@ final class Fx {
 		burst(at, 14, false);
 	}
 
-	static void shot() {
+	static void shot(boolean last) {
+		Sounds.shot(last);
 		sound(SoundEvents.ENTITY_FIREWORK_ROCKET_BLAST, 0.5f, 1.5f);
 	}
 
 	static void warp(Vec3d at) {
+		Sounds.warp();
 		sound(SoundEvents.ENTITY_ENDERMAN_TELEPORT, 0.6f, 1.8f);
 		petals(at, 18);
 	}

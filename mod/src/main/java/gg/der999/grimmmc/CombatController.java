@@ -208,6 +208,7 @@ public final class CombatController {
 			if (before < move.ability.fullCharge && chargeTime >= move.ability.fullCharge) Fx.chargeComplete(p.getPos());
 			if (!heavyHeld || chargeTime >= move.ability.maxCharge - 1e-4f) {
 				boolean full = chargeTime >= move.ability.fullCharge - 1e-4f;
+				Sounds.heavyRelease(full);
 				Move m = Moves.heavy(move.ability, full);
 				move = m;
 				moveTime = 0f;
@@ -353,6 +354,7 @@ public final class CombatController {
 		gravity = 0f;
 		gravitySpeed = 1f;
 		Fx.started(ability.coroutine, p.getPos());
+		Sounds.moveStart(ability, p.isOnGround());
 		return true;
 	}
 
@@ -505,7 +507,7 @@ public final class CombatController {
 	void shoot(int slot) {
 		CombatData.Attack atk = move == null ? null : move.ability.attacks[slot];
 		if (atk != null) HitService.shoot(MinecraftClient.getInstance(), this, atk.hit, target);
-		Fx.shot();
+		Fx.shot(false);
 	}
 
 	/** The third shot: GE fires a projectile whose damage lives in a prefab, so this is three bullets' worth. */
@@ -518,7 +520,7 @@ public final class CombatController {
 		h.knockBack = atk.hit.knockBack * 3f;
 		h.hitTime = atk.hit.hitTime;
 		HitService.shoot(MinecraftClient.getInstance(), this, h, target);
-		Fx.shot();
+		Fx.shot(true);
 	}
 
 	void push(float speed) {

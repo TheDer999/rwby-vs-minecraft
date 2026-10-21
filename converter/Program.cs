@@ -14,7 +14,7 @@ namespace GrimmConvert;
 /// </summary>
 static class Program
 {
-    const string ConverterVersion = "0.2.0";
+    const string ConverterVersion = "0.3.0";
     const string DataFolderPattern = "*_Data";
     const int ExitNotReady = 10;
 
@@ -70,7 +70,7 @@ static class Program
         if (!Characters.TryGetValue(character, out var spec))
             throw new ConvertException(ExitCodes.Usage, $"Unknown character '{character}'. Available: {string.Join(", ", Characters.Keys)}.");
 
-        const int total = 7;
+        const int total = 8;
         Progress(1, total, "Looking for Grimm Eclipse");
         var dataDir = FindDataDir(ge);
         var fingerprintFile = new FileInfo(Path.Combine(dataDir, Fingerprinted));
@@ -111,7 +111,10 @@ static class Program
             Progress(6, total, $"Reading {displayName}'s moves and damage numbers");
             var combat = CombatExport.Export(ua, spec.ScriptClass, Path.Combine(tmp, $"{spec.Id}_combat.json"), Info);
 
-            Progress(7, total, "Finishing");
+            Progress(7, total, $"Reading {displayName}'s sounds and voice lines");
+            var audio = AudioExport.Export(ua, tmp, Info);
+
+            Progress(8, total, "Finishing");
             var outputs = new List<object>();
             foreach (var f in Directory.GetFiles(tmp).OrderBy(f => f, StringComparer.Ordinal))
             {
@@ -137,6 +140,7 @@ static class Program
                 rig = new { vertices = rig.Vertices, bones = rig.Bones, nodes = rig.Nodes, clips = rig.Clips },
                 bodyTexture = new { name = body.Name, width = body.Width, height = body.Height, format = Textures.FormatName(body.Format) },
                 combat = new { abilities = combat.Abilities, roles = combat.Roles },
+                sounds = new { wanted = audio.Wanted, written = audio.Written },
                 weapon = new { parts = props.Parts, texture = new { name = props.Texture.Name, width = props.Texture.Width, height = props.Texture.Height, format = Textures.FormatName(props.Texture.Format) } },
                 outputs,
             };
