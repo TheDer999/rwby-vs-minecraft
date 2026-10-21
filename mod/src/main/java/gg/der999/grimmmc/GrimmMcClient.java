@@ -481,7 +481,7 @@ public class GrimmMcClient implements ClientModInitializer {
 	/** Combat self test: possess, summon a husk, click and dodge with the real vanilla keys, log what happens. */
 	static void autoCombat(MinecraftClient client) {
 		autoTicks++;
-		if (autoTicks >= 90 && autoTicks < 520) {
+		if (autoTicks >= 90 && autoTicks < 800) {
 			client.player.setYaw(0f);
 			client.player.setPitch(10f);
 		}
@@ -535,7 +535,8 @@ public class GrimmMcClient implements ClientModInitializer {
 		if (autoTicks == 492 && client.player.networkHandler != null) client.player.networkHandler.sendChatCommand("damage @s 6 minecraft:mob_attack");
 		if (autoTicks == 498) logTargets(client, "after 6 damage");
 		if (autoTicks == 499) shoot(client);
-		if (autoTicks == 505) client.scheduleStop();
+		if (autoTicks == 560 || autoTicks == 640 || autoTicks == 720 || autoTicks == 740) logTargets(client, "aura recharge t" + autoTicks);
+		if (autoTicks == 745) client.scheduleStop();
 	}
 
 	/** Listing screenshots: possess Ruby, fight a few still mobs, and take pictures at the interesting moments. */
@@ -636,7 +637,7 @@ public class GrimmMcClient implements ClientModInitializer {
 		var p = client.player;
 		var net = p.networkHandler;
 		var o = client.options;
-		if (n >= 90 && n < 520 && n != 0) { if (n < 330 || n > 400) { p.setYaw(0f); } }
+		if (n >= 90 && n < 800 && n != 0) { if (n < 330 || n > 400) { p.setYaw(0f); } }
 		if (n == 100) togglePossess(client);
 		if (n == 104 && net != null) net.sendChatCommand("gamemode survival");
 		// walking left: plain, then with Shift

@@ -32,10 +32,14 @@ final class GrimmConfig {
 	 * Players, tamed pets and armor stands are never hit.
 	 */
 	final boolean hitAllMobs;
+	/** Full aura in Grimm Eclipse points (config key aura_max; Grimm Eclipse has 4,000). Damage costs the same per hit, so more aura soaks more. */
+	final float auraMax;
+	/** Seconds the aura takes to refill once it starts recharging (config key aura_recharge_seconds; Grimm Eclipse uses 2). */
+	final float auraRechargeSeconds;
 	/** Enables the developer keys (animation browser, placed Ruby) (config key debug=true). */
 	final boolean debug;
 
-	private GrimmConfig(Path home, Path dataDir, String geDir, Path converter, float damageScale, float knockbackScale, boolean hitAllMobs, boolean debug) {
+	private GrimmConfig(Path home, Path dataDir, String geDir, Path converter, float damageScale, float knockbackScale, boolean hitAllMobs, float auraMax, float auraRechargeSeconds, boolean debug) {
 		this.home = home;
 		this.dataDir = dataDir;
 		this.geDir = geDir;
@@ -43,6 +47,8 @@ final class GrimmConfig {
 		this.damageScale = damageScale;
 		this.knockbackScale = knockbackScale;
 		this.hitAllMobs = hitAllMobs;
+		this.auraMax = auraMax;
+		this.auraRechargeSeconds = auraRechargeSeconds;
 		this.debug = debug;
 	}
 
@@ -85,6 +91,8 @@ final class GrimmConfig {
 			number(p, "damage_scale", 0.15f),
 			number(p, "knockback_scale", 0.35f),
 			!"false".equalsIgnoreCase(p.getProperty("hit_all_mobs", "true").trim()),
+			Math.max(100f, number(p, "aura_max", 12000f)),
+			number(p, "aura_recharge_seconds", 8f),
 			"true".equalsIgnoreCase(p.getProperty("debug", "false").trim()));
 	}
 }

@@ -12,20 +12,24 @@ import net.minecraft.client.network.ClientPlayerEntity;
 final class RubyStats {
 	private RubyStats() {}
 
-	static final float MAX_SHIELD = 4000f, MAX_HEALTH = 1000f;
+	/** Grimm Eclipse's aura is 4,000; three times that (config aura_max) suits Minecraft's steadier incoming damage. */
+	static float maxShield() { return GrimmMcClient.CONFIG.auraMax; }
+	static final float MAX_HEALTH = 1000f;
 	/** Minecraft damage to aura points: the full aura is worth a full row of hearts (20 health). */
-	static final float SHIELD_PER_DAMAGE = MAX_SHIELD / 20f;
-	static final float RECHARGE_DELAY = 3f, DEPLETED_DELAY = 5f, RECHARGE_SECONDS = 2f;
+	static final float SHIELD_PER_DAMAGE = 4000f / 20f;
+	/** Grimm Eclipse refills the aura in 2 s; in Minecraft that felt too fast, so the default is three times slower (config aura_recharge_seconds). */
+	static final float RECHARGE_DELAY = 3f, DEPLETED_DELAY = 5f;
+	static float rechargeSeconds() { return GrimmMcClient.CONFIG.auraRechargeSeconds; }
 	static final int HITS_PER_SPECIAL = 24;
 
-	private static float shield = MAX_SHIELD;
+	private static float shield = GrimmMcClient.CONFIG.auraMax;
 	private static boolean depleted;
 	private static float sinceHit = 99f;
 	private static int hits;
 	private static boolean specialReady;
 
 	static synchronized void reset() {
-		shield = MAX_SHIELD;
+		shield = maxShield();
 		depleted = false;
 		sinceHit = 99f;
 		hits = 0;
@@ -65,9 +69,9 @@ final class RubyStats {
 	/** Once per client tick while Ruby is possessed. */
 	static synchronized void tick(float dt) {
 		sinceHit += dt;
-		if (sinceHit >= (depleted ? DEPLETED_DELAY : RECHARGE_DELAY) && shield < MAX_SHIELD) {
-			shield = Math.min(MAX_SHIELD, shield + MAX_SHIELD / RECHARGE_SECONDS * dt);
-			if (shield >= MAX_SHIELD) depleted = false;
+		if (sinceHit >= (depleted ? DEPLETED_DELAY : RECHARGE_DELAY) && shield < maxShield()) {
+			shield = Math.min(maxShield(), shield + maxShield() / Math.max(0.1f, rechargeSeconds()) * dt);
+			if (shield >= maxShield()) depleted = false;
 		}
 	}
 
@@ -87,7 +91,7 @@ final class RubyStats {
 		int x = 8;
 		int y = 8;
 		float health = Math.max(0f, p.getHealth()) / Math.max(1f, p.getMaxHealth()) * MAX_HEALTH;
-		bar(ctx, client, x, y, "Aura", shield() / MAX_SHIELD, 0xFFE8EEF5, 0xFF8FB4D9, Math.round(shield()));
+		bar(ctx, client, x, y, "Aura", shield() / maxShield(), 0xFFE8EEF5, 0xFF8FB4D9, Math.round(shield()));
 		bar(ctx, client, x, y + 11, "Health", health / MAX_HEALTH, 0xFFE0453F, 0xFF7A1F1C, Math.round(health));
 		bar(ctx, client, x, y + 22, "Special", specialFill(), specialReady() ? 0xFFFFD34D : 0xFFC05A87, 0xFF5A2840,
 			specialReady() ? 1 : 0);
