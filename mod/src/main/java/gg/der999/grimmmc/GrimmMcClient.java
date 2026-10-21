@@ -22,6 +22,7 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.RotationAxis;
 import net.minecraft.util.math.Vec3d;
@@ -155,6 +156,7 @@ public class GrimmMcClient implements ClientModInitializer {
 				else if (AUTO_MODE.equals("combat")) autoCombat(client);
 				else if (AUTO_MODE.equals("media")) autoMedia(client);
 				else if (AUTO_MODE.equals("fight")) autoFight(client);
+				else if (AUTO_MODE.equals("move")) autoMove(client);
 				else if (AUTO_MODE.equals("placed")) autoStep(client);
 			}
 			if (place != null) while (place.wasPressed()) placeRuby(client);
@@ -278,7 +280,13 @@ public class GrimmMcClient implements ClientModInitializer {
 		boolean attack = inGame && client.options.attackKey.isPressed();
 		boolean shift = inGame && client.options.sneakKey.isPressed();
 		if (attack && !prevAttack) combat.press(CombatController.Action.LIGHT);
-		if (shift && !prevShift) combat.press(CombatController.Action.DODGE);
+		boolean inWater = client.player != null && client.player.isTouchingWater();
+		if (shift && !prevShift && !inWater) combat.press(CombatController.Action.DODGE);
+		applySprintBoost(client, shift && !inWater);
+		// Shift + forward swims when Ruby is under water (Minecraft's own sprint start does not catch Shift in water).
+		if (shift && inWater && client.options.forwardKey.isPressed() && client.player.isSubmergedInWater() && !client.player.isSprinting()) {
+			client.player.setSprinting(true);
+		}
 		boolean heavy = inGame && client.options.useKey.isPressed();
 		if (heavy && !prevHeavy) combat.press(CombatController.Action.HEAVY);
 		combat.setHeavyHeld(heavy);
@@ -304,6 +312,32 @@ public class GrimmMcClient implements ClientModInitializer {
 		combat.tick(client);
 	}
 
+	/** True while Shift is carrying Ruby sideways or backwards faster (Minecraft only sprints forwards). */
+	static boolean sprintBoost;
+
+	/**
+	 * Grimm Eclipse's dodge button is also its sprint button, in any direction. Minecraft's own sprint only works forwards,
+	 * so while Shift is held and Ruby moves sideways or back on the ground, her speed is raised to sprint speed here.
+	 */
+	static final net.minecraft.util.Identifier SPRINT_BOOST_ID = net.minecraft.util.Identifier.of("grimmmc", "sprint_boost");
+
+	static void applySprintBoost(MinecraftClient client, boolean shiftHeld) {
+		var p = client.player;
+		var o = client.options;
+		boolean forward = o.forwardKey.isPressed();
+		boolean other = o.backKey.isPressed() || o.leftKey.isPressed() || o.rightKey.isPressed();
+		sprintBoost = shiftHeld && !forward && other && p.isOnGround() && (combat == null || !combat.active());
+		var speed = p.getAttributeInstance(net.minecraft.entity.attribute.EntityAttributes.MOVEMENT_SPEED);
+		if (speed == null) return;
+		boolean has = speed.hasModifier(SPRINT_BOOST_ID);
+		if (sprintBoost && !has) {
+			// The same +30% Minecraft's own sprint gives.
+			speed.addTemporaryModifier(new net.minecraft.entity.attribute.EntityAttributeModifier(SPRINT_BOOST_ID, 0.3,
+				net.minecraft.entity.attribute.EntityAttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
+		} else if (!sprintBoost && has) {
+			speed.removeModifier(SPRINT_BOOST_ID);
+		}
+	}
 	/** Damage left for the player's health after Ruby's aura soaked its share (read on the integrated server's thread). */
 	public static float auraAbsorb(UUID id, float amount) {
 		return possessed && id.equals(possessedPlayer) ? RubyStats.absorb(amount) : amount;
@@ -328,7 +362,10 @@ public class GrimmMcClient implements ClientModInitializer {
 		if (!locked) {
 			String desired;
 			boolean oneShot = false;
-			if (!onGround) {
+			if (p.isTouchingWater()) {
+				// Grimm Eclipse has no swimming animations: she treads water with her walk and idle loops.
+				desired = speed > WALK_SPEED * 0.5 ? (p.isSwimming() ? "Run" : "Walk") : "Idle";
+			} else if (!onGround) {
 				boolean jumpPlaying = current.equals("Jump") && !looping && elapsed() < rig.clips[clipIndex].length;
 				if (jumpPlaying) {
 					desired = "Jump";
@@ -344,7 +381,7 @@ public class GrimmMcClient implements ClientModInitializer {
 			} else if (current.equals("JumpLand") && !looping && elapsed() < rig.clips[clipIndex].length) {
 				desired = "JumpLand";
 			} else if (speed > WALK_SPEED) {
-				desired = p.isSprinting() ? "Run" : "Walk";
+				desired = p.isSprinting() || sprintBoost ? "Run" : "Walk";
 			} else {
 				desired = "Idle";
 			}
@@ -573,6 +610,49 @@ public class GrimmMcClient implements ClientModInitializer {
 		}
 		return sb.toString();
 	}
+	static double moveX0, moveZ0, moveY0;
+
+	/** Movement self test: sideways walking with and without Shift, aimed shots, then swimming (sink, dive, surface). */
+	static void autoMove(MinecraftClient client) {
+		autoTicks++;
+		int n = autoTicks;
+		var p = client.player;
+		var net = p.networkHandler;
+		var o = client.options;
+		if (n >= 90 && n < 520 && n != 0) { if (n < 330 || n > 400) { p.setYaw(0f); } }
+		if (n == 100) togglePossess(client);
+		if (n == 104 && net != null) net.sendChatCommand("gamemode survival");
+		// walking left: plain, then with Shift
+		if (n == 120) { moveX0 = p.getX(); moveZ0 = p.getZ(); o.leftKey.setPressed(true); }
+		if (n == 140) { LOG.info("MOVE-TEST left only: {} blocks in 20 ticks", String.format("%.2f", Math.hypot(p.getX() - moveX0, p.getZ() - moveZ0))); o.leftKey.setPressed(false); }
+		if (n == 160) { o.leftKey.setPressed(true); o.sneakKey.setPressed(true); }
+		if (n == 170) { moveX0 = p.getX(); moveZ0 = p.getZ(); }
+		if (n == 190) { LOG.info("MOVE-TEST left + Shift (after the dodge): {} blocks in 20 ticks clip={}", String.format("%.2f", Math.hypot(p.getX() - moveX0, p.getZ() - moveZ0)), rig.clips[clipIndex].name); o.leftKey.setPressed(false); o.sneakKey.setPressed(false); }
+		// aimed shots at a zombie 10 blocks ahead
+		if (n == 192 && net != null) net.sendChatCommand("summon minecraft:zombie ~ ~ ~10 {NoAI:1b,Silent:1b,PersistenceRequired:1b}");
+		if (n == 200) { p.setPitch(1.6f); }
+		if (n >= 205 && n < 240 && n % 8 == 0) o.dropKey.setPressed(true);
+		if (n >= 205 && n < 240 && n % 8 == 2) o.dropKey.setPressed(false);
+		if (n == 245) LOG.info("MOVE-TEST aimed shots: {}", fightMobs(client));
+		if (n == 250) { p.setPitch(30f); }
+		if (n == 256) shoot(client);
+		if (n >= 262 && n < 290 && n % 8 == 0) o.dropKey.setPressed(true);
+		if (n >= 262 && n < 290 && n % 8 == 2) o.dropKey.setPressed(false);
+		if (n == 295) LOG.info("MOVE-TEST shots aimed at the ground: {}", fightMobs(client));
+		// water
+		if (n == 300 && net != null) net.sendChatCommand("kill @e[type=minecraft:zombie]");
+		if (n == 305 && net != null) net.sendChatCommand("fill ~-4 ~-3 ~-4 ~4 ~4 ~4 water");
+		if (n == 345) { o.sneakKey.setPressed(true); }
+		if (n == 360) LOG.info("MOVE-TEST sinking with Shift: y={} eyeY={} submerged={}", String.format("%.2f", p.getY()), String.format("%.2f", p.getEyeY()), p.isSubmergedInWater());
+		if (n == 400) { LOG.info("MOVE-TEST after sinking: y={} submerged={}", String.format("%.2f", p.getY()), p.isSubmergedInWater()); o.sneakKey.setPressed(false); }
+		if (n == 402) { p.setPitch(40f); o.forwardKey.setPressed(true); o.sneakKey.setPressed(true); }
+		if (n >= 404 && n <= 440 && n % 6 == 2) LOG.info("MOVE-TEST dive tick {}: y={} sprinting={} swimming={} submerged={} clip={}", n, String.format("%.2f", p.getY()), p.isSprinting(), p.isSwimming(), p.isSubmergedInWater(), rig.clips[clipIndex].name);
+		if (n == 420) shoot(client);
+		if (n == 441) { p.setPitch(-35f); }
+		if (n >= 443 && n <= 480 && n % 6 == 2) LOG.info("MOVE-TEST rise tick {}: y={} sprinting={} swimming={} submerged={}", n, String.format("%.2f", p.getY()), p.isSprinting(), p.isSwimming(), p.isSubmergedInWater());
+		if (n == 462) shoot(client);
+		if (n == 485) { o.forwardKey.setPressed(false); o.sneakKey.setPressed(false); client.scheduleStop(); }
+	}
 	static void logTargets(MinecraftClient client, String label) {
 		for (net.minecraft.entity.Entity e : client.world.getEntities()) {
 			if (e instanceof net.minecraft.entity.mob.Monster && e instanceof net.minecraft.entity.LivingEntity le) {
@@ -697,11 +777,14 @@ public class GrimmMcClient implements ClientModInitializer {
 
 		Vec3d at;
 		float yaw;
+		float lean = 0f, leanPitch = 0f; // swimming: Ruby lies out in the water as Minecraft's swimming pose does
 		if (possessed) {
 			PlayerEntity p = client.player;
 			if (p == null || client.options.getPerspective().isFirstPerson()) return;
 			float delta = ctx.tickCounter().getTickDelta(true);
 			at = p.getLerpedPos(delta);
+			lean = p.getLeaningPitch(delta);
+			leanPitch = p.getPitch(delta);
 			// Unity +Z (Ruby's forward) = the player's forward.
 			yaw = combat != null && combat.active()
 				? -combat.facingYaw()
@@ -751,6 +834,10 @@ public class GrimmMcClient implements ClientModInitializer {
 		ms.push();
 		ms.translate(at.x - cam.x, at.y - cam.y, at.z - cam.z);
 		ms.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(yaw));
+		if (lean > 0f) {
+			ms.translate(0, 0.35 * lean, 0);
+			ms.multiply(RotationAxis.POSITIVE_X.rotationDegrees((90f + MathHelper.clamp(leanPitch, -60f, 60f)) * lean));
+		}
 		ms.scale(SCALE, SCALE, SCALE);
 		MatrixStack.Entry entry = ms.peek();
 		Matrix4f m = entry.getPositionMatrix();

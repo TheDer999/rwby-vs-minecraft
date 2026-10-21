@@ -303,13 +303,14 @@ public final class CombatController {
 		Vec3d desired = desiredDirection(client, aim);
 		Entity previous = target;
 		boolean ranged = ability.comboType == 1;
-		target = autotarget ? selectTarget(client, desired != null ? yawOf(desired) : aim, desired != null, previous, range, ranged ? 45.0 : TARGET_ANGLE_CUTOFF) : null;
+		target = autotarget && !ranged ? selectTarget(client, desired != null ? yawOf(desired) : aim, desired != null, previous, range, ranged ? 45.0 : TARGET_ANGLE_CUTOFF) : null;
 		if (counterTarget != null) {
 			target = counterTarget;
 			counterTarget = null;
 		}
-		followTarget = autotarget;
-		facingYaw = target != null ? yawTo(p, target) : desired != null ? yawOf(desired) : aim;
+		followTarget = autotarget && !ranged;
+		// Ranged shots are aimed by hand: Ruby faces where the camera looks.
+		facingYaw = ranged ? aim : target != null ? yawTo(p, target) : desired != null ? yawOf(desired) : aim;
 
 		move = m;
 		moveTime = 0f;

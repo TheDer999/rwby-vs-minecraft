@@ -1,6 +1,7 @@
 package gg.der999.grimmmc;
 
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.render.Camera;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.mob.Monster;
@@ -67,12 +68,19 @@ final class HitService {
 	static void shoot(MinecraftClient client, CombatController combat, CombatData.Hit h, Entity aim) {
 		PlayerEntity p = client.player;
 		if (p == null || client.world == null || h == null) return;
-		Vec3d eye = p.getEyePos().subtract(0, 0.25, 0);
-		float yaw = combat.facingYaw() * MathHelper.RADIANS_PER_DEGREE, pitch = p.getPitch() * MathHelper.RADIANS_PER_DEGREE;
-		Vec3d dir = aim != null && aim.isAlive()
-			? aim.getBoundingBox().getCenter().subtract(eye).normalize()
-			: new Vec3d(-MathHelper.sin(yaw) * MathHelper.cos(pitch), -MathHelper.sin(pitch), MathHelper.cos(yaw) * MathHelper.cos(pitch));
-		Vec3d end = eye.add(dir.multiply(60));
+		// Aim like a third-person shooter: what the crosshair points at (seen from the camera) is where the shot goes,
+		// and it leaves from Ruby's gun toward that point, so cover in front of her still blocks it.
+		Camera camera = client.gameRenderer.getCamera();
+		float cy = camera.getYaw() * MathHelper.RADIANS_PER_DEGREE, cp = camera.getPitch() * MathHelper.RADIANS_PER_DEGREE;
+		Vec3d camDir = new Vec3d(-MathHelper.sin(cy) * MathHelper.cos(cp), -MathHelper.sin(cp), MathHelper.cos(cy) * MathHelper.cos(cp));
+		Vec3d aimPoint = crosshairPoint(client, p, camera.getPos(), camDir);
+		float fy = combat.facingYaw() * MathHelper.RADIANS_PER_DEGREE;
+		Vec3d eye = p.getPos().add(0, 1.25, 0)
+			.add(-MathHelper.sin(fy) * 0.6, 0, MathHelper.cos(fy) * 0.6)
+			.add(-MathHelper.cos(fy) * 0.2, 0, -MathHelper.sin(fy) * 0.2);
+		Vec3d dir = aimPoint.subtract(eye);
+		dir = dir.lengthSquared() < 1e-4 ? camDir : dir.normalize();
+		Vec3d end = eye.add(dir.multiply(80));
 		BlockHitResult block = client.world.raycast(new RaycastContext(eye, end, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, p));
 		if (block.getType() != HitResult.Type.MISS) end = block.getPos();
 		Entity best = null;
@@ -95,6 +103,22 @@ final class HitService {
 			one.add(best.getUuid());
 			deliver(client, p, one, dir.multiply(1, 0, 1).normalize(), h);
 		}
+	}
+
+	/** The first thing the camera's centre line meets (an enemy or a block), or a far point if it meets nothing. */
+	private static Vec3d crosshairPoint(MinecraftClient client, PlayerEntity p, Vec3d from, Vec3d dir) {
+		Vec3d end = from.add(dir.multiply(100));
+		BlockHitResult block = client.world.raycast(new RaycastContext(from, end, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, p));
+		if (block.getType() != HitResult.Type.MISS) end = block.getPos();
+		Vec3d best = end;
+		double bestDist = from.squaredDistanceTo(end);
+		for (Entity e : client.world.getOtherEntities(p, new Box(from, end).expand(1.0), HitService::isTarget)) {
+			java.util.Optional<Vec3d> point = e.getBoundingBox().expand(0.15).raycast(from, end);
+			if (point.isEmpty()) continue;
+			double d = from.squaredDistanceTo(point.get());
+			if (d < bestDist) { bestDist = d; best = point.get(); }
+		}
+		return best;
 	}
 
 	/** Hits one entity directly (the counter strike). */

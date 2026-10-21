@@ -29,7 +29,12 @@ public abstract class KeyboardInputMixin extends Input {
 			this.movementSideways = 0f;
 			return;
 		}
+		boolean moving = in.forward() || in.backward() || in.left() || in.right();
+		var p = MinecraftClient.getInstance().player;
+		boolean water = p != null && p.isTouchingWater();
+		// In water Shift is not a dodge: held on its own it sinks, held while moving forward it swims (Minecraft's sprint-swim).
+		boolean sink = water && shift && !moving;
 		this.playerInput = new PlayerInput(in.forward(), in.backward(), in.left(), in.right(), in.jump(),
-			false, in.sprint() || (shift && in.forward()));
+			sink, in.sprint() || (shift && in.forward()));
 	}
 }
