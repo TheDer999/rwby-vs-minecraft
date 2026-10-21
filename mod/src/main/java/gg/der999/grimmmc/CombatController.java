@@ -54,6 +54,8 @@ public final class CombatController {
 	private boolean uninterruptible;
 	private float invulnerableLeft;
 	private boolean visible = true;
+	/** After a dodge or a hit Ruby may walk away while the combo window is still open; her animation then follows her movement. */
+	private boolean walkingOut;
 	private boolean heavyHeld;
 	private float chargeTime;
 	private Entity counterTarget;
@@ -88,6 +90,12 @@ public final class CombatController {
 	// ---- queries
 
 	boolean active() { return phase != Phase.IDLE; }
+
+	/** A move is playing (its timeline or its charge), as opposed to the cooldown and combo window after it. */
+	public boolean busy() { return phase == Phase.MOVE || phase == Phase.CHARGE; }
+
+	/** True while the combat animation should be on screen; false when Ruby is walking out of a cooldown. */
+	public boolean showsClip() { return phase != Phase.IDLE && !walkingOut; }
 
 	/** True while a move's timeline is running: movement and jumping are locked (a dodge leaves Ruby free to act). */
 	boolean inMove() { return (phase == Phase.MOVE || phase == Phase.CHARGE) && !actionFree; }
@@ -174,6 +182,19 @@ public final class CombatController {
 			else if (a == Action.DODGE || a == Action.TAUNT || a == Action.SPECIAL) queued = Action.NONE; // an unavailable dodge is dropped
 		}
 
+		// Walking or sprinting out of a dodge or a finished move: the combo window stays open, but Ruby is free to move.
+		boolean freeNow = (phase == Phase.COOLDOWN || phase == Phase.WINDOW) && !uninterruptible
+			&& (client.options.forwardKey.isPressed() || client.options.backKey.isPressed()
+				|| client.options.leftKey.isPressed() || client.options.rightKey.isPressed());
+		if (freeNow && !walkingOut) {
+			stopPush();
+			stopPushUp();
+			gravityActive = false;
+			gravity = -10f;
+			gravitySpeed = 1f;
+		}
+		walkingOut = freeNow;
+
 		// Turn toward the target while a move runs (GE: follow lock).
 		if (followTarget && target != null && target.isAlive() && phase == Phase.MOVE) {
 			facingYaw = approachAngle(facingYaw, yawTo(p, target), 0.5f);
@@ -222,7 +243,7 @@ public final class CombatController {
 		}
 
 		applyPhysics(p);
-		if (phase != Phase.IDLE) {
+		if (showsClip()) {
 			p.setBodyYaw(facingYaw);
 			p.prevBodyYaw = facingYaw;
 		}
@@ -401,6 +422,7 @@ public final class CombatController {
 			double angleScore = 1.0 - angle / angleCutoff;
 			double distScore = 1.0 - dist / maxDistance;
 			double score = angleScore * weight + distScore * (1.0 - weight);
+			if (e instanceof net.minecraft.entity.mob.Monster) score += 0.4; // hostile mobs are what Ruby fights; others only when nothing hostile is near
 			if (e == previous) score += 0.1; // keep the previous target unless another is clearly better
 			if (score >= TARGET_MIN_SCORE && score > bestScore) {
 				best = e;
@@ -418,8 +440,10 @@ public final class CombatController {
 		for (Entity e : client.world.getOtherEntities(p, p.getBoundingBox().expand(8.5), HitService::isTarget)) {
 			// The server's target is not known to the client, so an enemy that is in attack mode (or swinging) close by counts.
 			double d = Math.hypot(e.getX() - p.getX(), e.getZ() - p.getZ());
-			boolean attacking = e instanceof net.minecraft.entity.mob.MobEntity m
-				&& ((m.isAttacking() && d <= 5.0) || (m.handSwinging && d <= 6.0));
+			// Only a hostile mob that is really about to strike: in attack mode and within its reach, swinging at her, or a
+			// ranged mob drawing its weapon.
+			boolean attacking = e instanceof net.minecraft.entity.mob.Monster && e instanceof net.minecraft.entity.mob.MobEntity m
+				&& ((m.isAttacking() && d <= 2.8) || (m.handSwinging && d <= 3.5) || (m.isUsingItem() && d <= 10.0));
 			if (attacking && d < bestDist) {
 				best = e;
 				bestDist = d;

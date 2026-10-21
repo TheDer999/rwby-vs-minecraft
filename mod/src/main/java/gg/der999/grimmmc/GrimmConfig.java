@@ -27,16 +27,22 @@ final class GrimmConfig {
 	final float damageScale;
 	/** Scales Grimm Eclipse's knockback and launch distances to Minecraft (config key knockback_scale). */
 	final float knockbackScale;
+	/**
+	 * Whether Ruby's attacks hurt every kind of mob (default) or only hostile ones (config key hit_all_mobs=false).
+	 * Players, tamed pets and armor stands are never hit.
+	 */
+	final boolean hitAllMobs;
 	/** Enables the developer keys (animation browser, placed Ruby) (config key debug=true). */
 	final boolean debug;
 
-	private GrimmConfig(Path home, Path dataDir, String geDir, Path converter, float damageScale, float knockbackScale, boolean debug) {
+	private GrimmConfig(Path home, Path dataDir, String geDir, Path converter, float damageScale, float knockbackScale, boolean hitAllMobs, boolean debug) {
 		this.home = home;
 		this.dataDir = dataDir;
 		this.geDir = geDir;
 		this.converter = converter;
 		this.damageScale = damageScale;
 		this.knockbackScale = knockbackScale;
+		this.hitAllMobs = hitAllMobs;
 		this.debug = debug;
 	}
 
@@ -78,6 +84,7 @@ final class GrimmConfig {
 			converter == null || converter.isBlank() ? null : Path.of(converter.trim()),
 			number(p, "damage_scale", 0.15f),
 			number(p, "knockback_scale", 0.35f),
+			!"false".equalsIgnoreCase(p.getProperty("hit_all_mobs", "true").trim()),
 			"true".equalsIgnoreCase(p.getProperty("debug", "false").trim()));
 	}
 }

@@ -27,9 +27,9 @@ Grimm Eclipse's PC controls and move timings (singleplayer only; hostile mobs ar
 |---|---|
 | Left click | Light combo (press again inside the combo window to chain; ground and air versions) |
 | Right click (hold) | Heavy attack: hold to charge, release to swing; after a light hit it becomes the matching heavy combo move |
-| Shift (tap) | Dodge (invulnerable 0.7 s on the ground, 0.5 s in the air); attack right after it for the dash attack. Hold Shift while moving in any direction to sprint (sideways and backwards get Minecraft's sprint speed bonus too). In water Shift is not a dodge: hold it alone to sink, or while moving forward under water to swim |
+| Shift (tap) | Dodge (invulnerable 0.7 s on the ground, 0.5 s in the air); attack right after it for the dash attack. Hold Shift while moving to sprint, also straight out of a dodge (sideways and backwards get Minecraft's sprint speed bonus too). In water Shift is not a dodge: hold it to sink. Moving forward under water swims by itself |
 | Q (hold) | Ranged shot, aimed by hand: the shot goes to what the crosshair points at (seen from the camera) and leaves from Ruby's gun, so cover in front of her blocks it. The 3rd shot in a combo is a heavier one |
-| F | Counter an enemy that is attacking you; with nothing to counter she plays the failed-counter animation |
+| F | Counter a hostile mob that is about to strike (within about 3 blocks and in attack mode or swinging, or a skeleton drawing its bow); with nothing to counter she plays the failed-counter animation |
 | Middle click | Special: Crescendo, once the Special bar is full (24 landed hits) |
 | Ctrl (tap, standing still) | Reap: warps to a nearby enemy (within 9 blocks), spins three hits and a smashing finish. Grimm Eclipse's team attack, here as a solo move |
 | WASD / Space | Move and jump; locked while a move is playing, as in Grimm Eclipse |
@@ -40,6 +40,9 @@ The HUD (top left) shows Aura (4,000, soaks damage before your health; recharges
 Sound and effects use Minecraft's own sounds and particles (rose petals are red dust); Grimm Eclipse's own audio and effects are not used. Not ported: taunt, the upgraded Crescendo variants' selection, sniper form.
 
 **Developer keys** (only with `debug=true` in `config.properties`): `[` places Ruby, `,` / `.` browse all 46 clips.
+## Who she hurts
+By default every mob (hostile ones are preferred as targets). hit_all_mobs=false in config.properties limits her to hostile mobs. Players, tamed pets and armor stands are never hit.
+
 ## Swimming
 Grimm Eclipse has no swimming animations, so in water Ruby treads water with her idle and walk loops, and lies out flat like Minecraft's swimming pose when she swims under water.
 

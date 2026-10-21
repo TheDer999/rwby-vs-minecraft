@@ -166,7 +166,7 @@ public class GrimmMcClient implements ClientModInitializer {
 				client.player.setInvisible(true); // hide the vanilla model; re-asserted every tick
 				handleCombatInput(client);
 				RubyStats.tick(CombatController.DT);
-				if (combat == null || !combat.active()) updateLocomotion(client);
+				if (combat == null || !combat.showsClip()) updateLocomotion(client);
 			}
 
 			boolean active = rig != null && (placed || possessed);
@@ -283,9 +283,13 @@ public class GrimmMcClient implements ClientModInitializer {
 		boolean inWater = client.player != null && client.player.isTouchingWater();
 		if (shift && !prevShift && !inWater) combat.press(CombatController.Action.DODGE);
 		applySprintBoost(client, shift && !inWater);
-		// Shift + forward swims when Ruby is under water (Minecraft's own sprint start does not catch Shift in water).
-		if (shift && inWater && client.options.forwardKey.isPressed() && client.player.isSubmergedInWater() && !client.player.isSprinting()) {
-			client.player.setSprinting(true);
+		// Minecraft only starts a sprint from its own sprint key; Shift (Grimm Eclipse's dodge and sprint button) and swimming
+		// forward under water start one here.
+		var pl = client.player;
+		if (pl != null && inGame && client.options.forwardKey.isPressed() && !pl.isSprinting() && !pl.isUsingItem()
+				&& pl.getHungerManager().getFoodLevel() > 6 && (combat == null || !combat.busy())) {
+			boolean grounded = pl.isOnGround() && !inWater;
+			if ((shift && grounded) || (inWater && pl.isSubmergedInWater())) pl.setSprinting(true);
 		}
 		boolean heavy = inGame && client.options.useKey.isPressed();
 		if (heavy && !prevHeavy) combat.press(CombatController.Action.HEAVY);
@@ -326,7 +330,7 @@ public class GrimmMcClient implements ClientModInitializer {
 		var o = client.options;
 		boolean forward = o.forwardKey.isPressed();
 		boolean other = o.backKey.isPressed() || o.leftKey.isPressed() || o.rightKey.isPressed();
-		sprintBoost = shiftHeld && !forward && other && p.isOnGround() && (combat == null || !combat.active());
+		sprintBoost = shiftHeld && !forward && other && p.isOnGround() && (combat == null || !combat.busy());
 		var speed = p.getAttributeInstance(net.minecraft.entity.attribute.EntityAttributes.MOVEMENT_SPEED);
 		if (speed == null) return;
 		boolean has = speed.hasModifier(SPRINT_BOOST_ID);
@@ -597,7 +601,20 @@ public class GrimmMcClient implements ClientModInitializer {
 		if (n == 288) client.options.sprintKey.setPressed(false);
 		if (n == 292 || n == 298 || n == 306) shoot(client);
 		if (n == 325) logTargets(client, "after reap");
-		if (n == 335) client.scheduleStop();
+		if (n == 330 && net != null) net.sendChatCommand("summon minecraft:pig ~ ~ ~2.6 {NoAI:1b,Silent:1b,PersistenceRequired:1b}");
+		if (n == 340) logPig(client, "pig before");
+		for (int c : new int[] {345, 356, 367, 378}) {
+			if (n == c) client.options.attackKey.setPressed(true);
+			if (n == c + 1) client.options.attackKey.setPressed(false);
+		}
+		if (n == 400) logPig(client, "pig after light combo");
+		if (n == 405) client.scheduleStop();
+	}
+
+	static void logPig(MinecraftClient client, String label) {
+		for (net.minecraft.entity.Entity e : client.world.getEntities()) {
+			if (e instanceof net.minecraft.entity.passive.PigEntity pig && pig.distanceTo(client.player) < 8) LOG.info("FIGHT-TEST {}: pig hp={} d={} hits={} aliveNoAI={}", label, String.format("%.1f", pig.getHealth()), String.format("%.1f", pig.distanceTo(client.player)), hitsLanded, pig.isAiDisabled());
+		}
 	}
 
 	static String fightMobs(MinecraftClient client) {
@@ -625,9 +642,10 @@ public class GrimmMcClient implements ClientModInitializer {
 		// walking left: plain, then with Shift
 		if (n == 120) { moveX0 = p.getX(); moveZ0 = p.getZ(); o.leftKey.setPressed(true); }
 		if (n == 140) { LOG.info("MOVE-TEST left only: {} blocks in 20 ticks", String.format("%.2f", Math.hypot(p.getX() - moveX0, p.getZ() - moveZ0))); o.leftKey.setPressed(false); }
-		if (n == 160) { o.leftKey.setPressed(true); o.sneakKey.setPressed(true); }
+		if (n == 160) { o.forwardKey.setPressed(true); o.sneakKey.setPressed(true); }
+		if (n >= 161 && n <= 190 && n % 4 == 1) LOG.info("MOVE-TEST dodge-run tick {}: clip={} sprinting={} speed={} combatActive={} shows={}", n, rig.clips[clipIndex].name, p.isSprinting(), String.format("%.2f", Math.hypot(p.getVelocity().x, p.getVelocity().z)), combat != null && combat.active(), combat != null && combat.showsClip());
 		if (n == 170) { moveX0 = p.getX(); moveZ0 = p.getZ(); }
-		if (n == 190) { LOG.info("MOVE-TEST left + Shift (after the dodge): {} blocks in 20 ticks clip={}", String.format("%.2f", Math.hypot(p.getX() - moveX0, p.getZ() - moveZ0)), rig.clips[clipIndex].name); o.leftKey.setPressed(false); o.sneakKey.setPressed(false); }
+		if (n == 190) { LOG.info("MOVE-TEST left + Shift (after the dodge): {} blocks in 20 ticks clip={}", String.format("%.2f", Math.hypot(p.getX() - moveX0, p.getZ() - moveZ0)), rig.clips[clipIndex].name); o.forwardKey.setPressed(false); o.sneakKey.setPressed(false); }
 		// aimed shots at a zombie 10 blocks ahead
 		if (n == 192 && net != null) net.sendChatCommand("summon minecraft:zombie ~ ~ ~10 {NoAI:1b,Silent:1b,PersistenceRequired:1b}");
 		if (n == 200) { p.setPitch(1.6f); }
@@ -645,13 +663,14 @@ public class GrimmMcClient implements ClientModInitializer {
 		if (n == 345) { o.sneakKey.setPressed(true); }
 		if (n == 360) LOG.info("MOVE-TEST sinking with Shift: y={} eyeY={} submerged={}", String.format("%.2f", p.getY()), String.format("%.2f", p.getEyeY()), p.isSubmergedInWater());
 		if (n == 400) { LOG.info("MOVE-TEST after sinking: y={} submerged={}", String.format("%.2f", p.getY()), p.isSubmergedInWater()); o.sneakKey.setPressed(false); }
-		if (n == 402) { p.setPitch(40f); o.forwardKey.setPressed(true); o.sneakKey.setPressed(true); }
+		if (n == 402) { p.setPitch(40f); o.forwardKey.setPressed(true); }
 		if (n >= 404 && n <= 440 && n % 6 == 2) LOG.info("MOVE-TEST dive tick {}: y={} sprinting={} swimming={} submerged={} clip={}", n, String.format("%.2f", p.getY()), p.isSprinting(), p.isSwimming(), p.isSubmergedInWater(), rig.clips[clipIndex].name);
 		if (n == 420) shoot(client);
 		if (n == 441) { p.setPitch(-35f); }
+		if (n >= 443 && n <= 447) { }
 		if (n >= 443 && n <= 480 && n % 6 == 2) LOG.info("MOVE-TEST rise tick {}: y={} sprinting={} swimming={} submerged={}", n, String.format("%.2f", p.getY()), p.isSprinting(), p.isSwimming(), p.isSubmergedInWater());
 		if (n == 462) shoot(client);
-		if (n == 485) { o.forwardKey.setPressed(false); o.sneakKey.setPressed(false); client.scheduleStop(); }
+		if (n == 485) { o.forwardKey.setPressed(false); client.scheduleStop(); }
 	}
 	static void logTargets(MinecraftClient client, String label) {
 		for (net.minecraft.entity.Entity e : client.world.getEntities()) {
@@ -786,7 +805,7 @@ public class GrimmMcClient implements ClientModInitializer {
 			lean = p.getLeaningPitch(delta);
 			leanPitch = p.getPitch(delta);
 			// Unity +Z (Ruby's forward) = the player's forward.
-			yaw = combat != null && combat.active()
+			yaw = combat != null && combat.showsClip()
 				? -combat.facingYaw()
 				: -MathHelper.lerpAngleDegrees(delta, p.prevBodyYaw, p.bodyYaw);
 		} else {
@@ -797,7 +816,7 @@ public class GrimmMcClient implements ClientModInitializer {
 
 		Rig.Clip clip;
 		CombatController cc = combat;
-		if (possessed && cc != null && cc.active() && cc.clipName() != null && rig.findClip(cc.clipName()) >= 0) {
+		if (possessed && cc != null && cc.showsClip() && cc.clipName() != null && rig.findClip(cc.clipName()) >= 0) {
 			clip = rig.clips[rig.findClip(cc.clipName())];
 			float sinceTick = Math.min(CombatController.DT, (System.nanoTime() - lastCombatTickNanos) / 1_000_000_000f);
 			timeBuf[0] = Math.min(clip.length, cc.clipTime() + sinceTick);
@@ -813,7 +832,7 @@ public class GrimmMcClient implements ClientModInitializer {
 			fadeFrom = lastClip;
 			fadeFromTime = lastClipTime;
 			fadeStartNanos = nowNanos;
-			fadeSeconds = possessed && cc != null && cc.active() ? 0.07f : 0.15f;
+			fadeSeconds = possessed && cc != null && cc.showsClip() ? 0.07f : 0.15f;
 		}
 		lastClip = clip;
 		lastClipTime = t;

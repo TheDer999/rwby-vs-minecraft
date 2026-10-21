@@ -35,7 +35,13 @@ final class HitService {
 
 	/** Which entities Ruby's attacks hurt: hostile mobs (Grimm Eclipse's Grimm are her only enemies). */
 	static boolean isTarget(Entity e) {
-		return e instanceof LivingEntity && e instanceof Monster && e.isAlive() && !e.isRemoved();
+		if (!(e instanceof LivingEntity) || !e.isAlive() || e.isRemoved()) return false;
+		if (e instanceof PlayerEntity || e instanceof net.minecraft.entity.decoration.ArmorStandEntity) return false;
+		if (e instanceof Monster) return true;
+		if (!GrimmMcClient.CONFIG.hitAllMobs) return false;
+		if (e instanceof net.minecraft.entity.passive.TameableEntity t && t.isTamed()) return false;
+		if (e instanceof net.minecraft.entity.passive.AbstractHorseEntity h && h.isTame()) return false;
+		return true;
 	}
 
 	static void hit(MinecraftClient client, CombatController combat, CombatData.Attack atk) {
