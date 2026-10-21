@@ -100,7 +100,7 @@ final class GrimmConfig {
 			number(p, "damage_scale", 0.15f),
 			number(p, "knockback_scale", 0.35f),
 			!"false".equalsIgnoreCase(p.getProperty("hit_all_mobs", "true").trim()),
-			Math.max(100f, number(p, "aura_max", 12000f)),
+			Math.max(100f, number(p, "aura_max", 8000f)),
 			number(p, "aura_recharge_seconds", 8f),
 			!"false".equalsIgnoreCase(p.getProperty("ge_sounds", "true").trim()),
 			Math.max(0f, number(p, "sound_volume", 1f)),

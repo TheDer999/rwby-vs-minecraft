@@ -8,7 +8,7 @@
     <AssemblyName>GrimmConvert</AssemblyName>
     <RootNamespace>GrimmConvert</RootNamespace>
     <InvariantGlobalization>true</InvariantGlobalization>
-    <Version>0.3.0</Version>
+    <Version>0.3.1</Version>
   </PropertyGroup>
 
   <ItemGroup>

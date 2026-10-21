@@ -17,7 +17,9 @@ static class AudioExport
     /// <summary>Which AudioClips belong to the character: the names Grimm Eclipse gives her sounds and voice lines.</summary>
     public static bool IsCharacterSound(string name) =>
         name.StartsWith("ruby_", StringComparison.Ordinal) || name.StartsWith("Ruby - ", StringComparison.Ordinal)
-        || name.StartsWith("weap_crescentrose_", StringComparison.Ordinal);
+        || name.StartsWith("weap_crescentrose_", StringComparison.Ordinal)
+        // Grimm Eclipse's shared aura sounds: refilling, soaking a hit, breaking.
+        || name is "Aura Recharge" or "Guard 01" or "Block Break";
 
     public static string FileName(string clipName) => "sound_" + clipName.Replace(' ', '_').Replace("-", "") .Replace("__", "_") + ".wav";
 

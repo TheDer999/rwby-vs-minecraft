@@ -169,6 +169,21 @@ final class Sounds {
 		any("ruby_warp_to_target_", 0.9f);
 	}
 
+	private static long lastAuraNanos;
+
+	/** Her aura soaking a hit (Grimm Eclipse's guard sound, at most one per 0.15 s) or breaking (its block-break sound). */
+	static void auraHit(boolean absorbed, boolean broke) {
+		if (!active()) return;
+		long now = System.nanoTime();
+		if (broke) { any("block_break", 1.0f); lastAuraNanos = now; return; }
+		if (absorbed && now - lastAuraNanos > 150_000_000L) { lastAuraNanos = now; any("guard_01", 0.7f); }
+	}
+
+	/** The aura starts refilling. */
+	static void auraRecharge() {
+		any("aura_recharge", 0.8f);
+	}
+
 	/** Ruby hurt (called when her aura or health takes damage). */
 	static void hurt() {
 		voice("ruby_hit_", 0.6f);

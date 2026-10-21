@@ -375,8 +375,13 @@ public class GrimmMcClient implements ClientModInitializer {
 	/** Damage left for the player's health after Ruby's aura soaked its share (read on the integrated server's thread). */
 	public static float auraAbsorb(UUID id, float amount) {
 		if (possessed && id.equals(possessedPlayer)) {
-			if (amount > 0f) MinecraftClient.getInstance().execute(Sounds::hurt);
-			return RubyStats.absorb(amount);
+			float before = RubyStats.shield();
+			float rest = RubyStats.absorb(amount);
+			if (amount > 0f) {
+				boolean broke = before > 0f && RubyStats.shield() <= 0f;
+				MinecraftClient.getInstance().execute(() -> { Sounds.auraHit(before > 0f, broke); Sounds.hurt(); });
+			}
+			return rest;
 		}
 		return amount;
 	}

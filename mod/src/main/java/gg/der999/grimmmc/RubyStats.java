@@ -23,7 +23,7 @@ final class RubyStats {
 	static final int HITS_PER_SPECIAL = 24;
 
 	private static float shield = GrimmMcClient.CONFIG.auraMax;
-	private static boolean depleted;
+	private static boolean depleted, recharging;
 	private static float sinceHit = 99f;
 	private static int hits;
 	private static boolean specialReady;
@@ -31,6 +31,7 @@ final class RubyStats {
 	static synchronized void reset() {
 		shield = maxShield();
 		depleted = false;
+		recharging = false;
 		sinceHit = 99f;
 		hits = 0;
 		specialReady = false;
@@ -70,8 +71,11 @@ final class RubyStats {
 	static synchronized void tick(float dt) {
 		sinceHit += dt;
 		if (sinceHit >= (depleted ? DEPLETED_DELAY : RECHARGE_DELAY) && shield < maxShield()) {
-			shield = Math.min(maxShield(), shield + maxShield() / Math.max(0.1f, rechargeSeconds()) * dt);
+			if (!recharging) { recharging = true; Sounds.auraRecharge(); }
+			shield =Math.min(maxShield(), shield + maxShield() / Math.max(0.1f, rechargeSeconds()) * dt);
 			if (shield >= maxShield()) depleted = false;
+		} else if (sinceHit < RECHARGE_DELAY || shield >= maxShield()) {
+			recharging = false;
 		}
 	}
 
