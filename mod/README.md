@@ -35,7 +35,7 @@ Grimm Eclipse's PC controls and move timings (singleplayer only; hostile mobs ar
 | WASD / Space | Move and jump; locked while a move is playing, as in Grimm Eclipse |
 
 Moves auto-target the best enemy in front of you (Grimm Eclipse's scoring), turn toward it and stop short of it. Damage, knockback and launch use
-Grimm Eclipse's numbers through `damage_scale` (default 0.15) and `knockback_scale` (default 0.35) in `config.properties`.
+Grimm Eclipse's numbers (every hit that pushes at all moves its victim at least two thirds of a block, so light combos shove enemies back) through `damage_scale` (default 0.15) and `knockback_scale` (default 0.35) in `config.properties`.
 The HUD (top left) shows Aura (4,000, soaks damage before your health; recharges after 3 s, 5 s if emptied), Health (1,000 = 20 hearts) and Special.
 Sound and effects use Minecraft's own sounds and particles (rose petals are red dust); Grimm Eclipse's own audio and effects are not used. Not ported: taunt, the upgraded Crescendo variants' selection, sniper form.
 

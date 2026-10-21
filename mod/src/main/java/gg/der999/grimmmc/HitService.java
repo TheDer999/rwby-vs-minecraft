@@ -164,7 +164,11 @@ final class HitService {
 			// Knockback: Grimm Eclipse pushes for hitTime seconds at knockBack units per second. Negative pulls the target in.
 			Vec3d away = new Vec3d(target.getX() - origin.x, 0, target.getZ() - origin.z);
 			away = away.lengthSquared() < 1e-6 ? fwd : away.normalize();
-			double distance = h.knockBack * h.hitTime * GrimmMcClient.CONFIG.knockbackScale;
+			double scale = GrimmMcClient.CONFIG.knockbackScale;
+			double distance = h.knockBack * h.hitTime * scale;
+			// Grimm Eclipse's light hits stagger an enemy more than they shove it; in Minecraft that reads as no knockback at
+			// all, so every hit that pushes at all moves its victim at least about two thirds of a block.
+			if (h.knockBack > 0f && scale > 0) distance = Math.max(distance, 0.7 * scale / 0.35);
 			double horizontal = distance * 0.45; // ground friction in Minecraft spreads a velocity over about 2.2 ticks of travel
 			Vec3d v = target.getVelocity();
 			double vy = v.y;
