@@ -70,10 +70,66 @@ final class HitService {
 		deliver(client, p, targets, fwd, atk.hit);
 	}
 
-	/** Dirt, grass and the like: the only blocks Ruby's attacks break. */
-	static boolean isBreakable(net.minecraft.block.BlockState state) {
-		return state.isIn(net.minecraft.registry.tag.BlockTags.DIRT)
-			|| state.isOf(net.minecraft.block.Blocks.FARMLAND) || state.isOf(net.minecraft.block.Blocks.DIRT_PATH);
+	/** Sand, gravel, wood, leaves and glass: as hard as dirt, but breaking one takes its neighbours of the same kind with it. 0 if the block is none of them. */
+	private static int bulkKind(net.minecraft.block.BlockState state) {
+		if (state.isIn(net.minecraft.registry.tag.BlockTags.SAND)) return 1;
+		if (state.isOf(net.minecraft.block.Blocks.GRAVEL)) return 2;
+		if (state.isIn(net.minecraft.registry.tag.BlockTags.LOGS)) return 3;
+		if (state.isIn(net.minecraft.registry.tag.BlockTags.PLANKS) || state.isIn(net.minecraft.registry.tag.BlockTags.WOODEN_SLABS)
+			|| state.isIn(net.minecraft.registry.tag.BlockTags.WOODEN_STAIRS) || state.isIn(net.minecraft.registry.tag.BlockTags.WOODEN_FENCES)) return 4;
+		if (state.isIn(net.minecraft.registry.tag.BlockTags.LEAVES)) return 5;
+		if (state.isIn(net.minecraft.registry.tag.BlockTags.IMPERMEABLE)
+			|| (state.getBlock() instanceof net.minecraft.block.PaneBlock && !state.isOf(net.minecraft.block.Blocks.IRON_BARS))) return 6;
+		return 0;
+	}
+
+	/** Whether a block is stone-like: stone, deepslate, ores, bricks, netherrack, obsidian and the like. */
+	private static boolean stoneLike(net.minecraft.block.BlockState state) {
+		net.minecraft.sound.BlockSoundGroup g = state.getSoundGroup();
+		return g == net.minecraft.sound.BlockSoundGroup.STONE || g == net.minecraft.sound.BlockSoundGroup.DEEPSLATE
+			|| g == net.minecraft.sound.BlockSoundGroup.DEEPSLATE_BRICKS || g == net.minecraft.sound.BlockSoundGroup.DEEPSLATE_TILES
+			|| g == net.minecraft.sound.BlockSoundGroup.POLISHED_DEEPSLATE || g == net.minecraft.sound.BlockSoundGroup.TUFF
+			|| g == net.minecraft.sound.BlockSoundGroup.TUFF_BRICKS || g == net.minecraft.sound.BlockSoundGroup.POLISHED_TUFF
+			|| g == net.minecraft.sound.BlockSoundGroup.CALCITE || g == net.minecraft.sound.BlockSoundGroup.BASALT
+			|| g == net.minecraft.sound.BlockSoundGroup.NETHERRACK || g == net.minecraft.sound.BlockSoundGroup.NETHER_BRICKS
+			|| g == net.minecraft.sound.BlockSoundGroup.NETHER_ORE || g == net.minecraft.sound.BlockSoundGroup.ANCIENT_DEBRIS
+			|| state.isIn(net.minecraft.registry.tag.BlockTags.BASE_STONE_OVERWORLD) || state.isIn(net.minecraft.registry.tag.BlockTags.BASE_STONE_NETHER);
+	}
+
+	/**
+	 * How much of an attack's depth a block uses up to break, 0 if Ruby cannot break it. Dirt and its kin, sand, gravel, wood, leaves and
+	 * glass cost 1; stone and the like cost 2 (twice as hard); obsidian and the like cost 3. Blocks that hold something (chests,
+	 * furnaces, spawners), liquids, plants, redstone and anything unbreakable are left alone.
+	 */
+	static int cost(net.minecraft.world.BlockView world, net.minecraft.util.math.BlockPos pos, net.minecraft.block.BlockState state) {
+		if (state.isAir() || !state.getFluidState().isEmpty()) return 0;
+		if (world.getBlockEntity(pos) != null) return 0;
+		if (state.isIn(net.minecraft.registry.tag.BlockTags.DIRT) || state.isOf(net.minecraft.block.Blocks.FARMLAND)
+			|| state.isOf(net.minecraft.block.Blocks.DIRT_PATH) || bulkKind(state) != 0) return 1;
+		float hardness = state.getHardness(world, pos);
+		if (hardness <= 0f || !stoneLike(state)) return 0;
+		return hardness <= 5f ? 2 : 3;
+	}
+
+	/** Breaking a bulk block (sand, gravel, wood, leaves, glass) also takes up to 8 connected blocks of the same kind within 2 blocks of it. */
+	private static void cascade(MinecraftClient client, net.minecraft.util.math.BlockPos origin, net.minecraft.block.BlockState state, List<net.minecraft.util.math.BlockPos> found) {
+		int kind = bulkKind(state);
+		if (kind == 0) return;
+		java.util.ArrayDeque<net.minecraft.util.math.BlockPos> queue = new java.util.ArrayDeque<>();
+		queue.add(origin);
+		int extra = 0;
+		while (!queue.isEmpty() && extra < 8) {
+			net.minecraft.util.math.BlockPos at = queue.poll();
+			for (net.minecraft.util.math.Direction d : net.minecraft.util.math.Direction.values()) {
+				net.minecraft.util.math.BlockPos next = at.offset(d);
+				if (extra >= 8 || found.size() >= 60) return;
+				if (Math.abs(next.getX() - origin.getX()) > 2 || Math.abs(next.getY() - origin.getY()) > 2 || Math.abs(next.getZ() - origin.getZ()) > 2) continue;
+				if (found.contains(next) || bulkKind(client.world.getBlockState(next)) != kind) continue;
+				found.add(next.toImmutable());
+				queue.add(next);
+				extra++;
+			}
+		}
 	}
 
 	/**
@@ -103,19 +159,24 @@ final class HitService {
 
 	/** Walks a line and adds up to `depth` breakable blocks along it; it ends at the first solid block that cannot be broken. */
 	private static void drill(MinecraftClient client, Vec3d start, Vec3d dir, double contactReach, double length, int depth, int minY, List<net.minecraft.util.math.BlockPos> found) {
-		int count = 0;
+		int used = 0;
 		net.minecraft.util.math.BlockPos last = null;
-		for (double t = 0; t <= length && count < depth && found.size() < 40; t += 0.25) {
-			if (count == 0 && t > contactReach) break; // nothing breakable within reach of the swing
+		for (double t = 0; t <= length && used < depth && found.size() < 60; t += 0.25) {
+			if (used == 0 && t > contactReach) break; // nothing breakable within reach of the swing
 			Vec3d at = start.add(dir.multiply(t));
 			net.minecraft.util.math.BlockPos pos = net.minecraft.util.math.BlockPos.ofFloored(at);
 			if (pos.equals(last)) continue;
 			last = pos;
 			if (pos.getY() < minY) continue;
 			net.minecraft.block.BlockState state = client.world.getBlockState(pos);
-			if (isBreakable(state)) {
-				count++;
-				if (!found.contains(pos)) found.add(pos.toImmutable());
+			int c = cost(client.world, pos, state);
+			if (c > 0) {
+				if (c > depth - used) break; // too hard for what is left of this attack's depth
+				used += c;
+				if (!found.contains(pos)) {
+					found.add(pos.toImmutable());
+					cascade(client, pos, state, found);
+				}
 			} else if (!state.getCollisionShape(client.world, pos).isEmpty()) {
 				break;
 			}
@@ -129,7 +190,9 @@ final class HitService {
 				MathHelper.floor(center.x + radius), MathHelper.floor(center.y + radius), MathHelper.floor(center.z + radius))) {
 			if (found.size() >= 40) return;
 			if (pos.getSquaredDistance(center.x - 0.5, center.y - 0.5, center.z - 0.5) > radius * radius) continue;
-			if (isBreakable(client.world.getBlockState(pos)) && !found.contains(pos)) found.add(pos.toImmutable());
+			// the crosshair burst only takes what costs 1 or 2 (not obsidian)
+			int c = cost(client.world, pos, client.world.getBlockState(pos));
+			if (c > 0 && c <= 2 && !found.contains(pos)) found.add(pos.toImmutable());
 		}
 	}
 
@@ -178,7 +241,13 @@ final class HitService {
 			ServerPlayerEntity player = server.getPlayerManager().getPlayer(playerId);
 			if (world == null || player == null) return;
 			for (net.minecraft.util.math.BlockPos pos : positions) {
-				if (isBreakable(world.getBlockState(pos)) && world.canPlayerModifyAt(player, pos)) world.breakBlock(pos, true, player);
+				net.minecraft.block.BlockState state = world.getBlockState(pos);
+				if (cost(world, pos, state) == 0 || !world.canPlayerModifyAt(player, pos)) continue;
+				// Whatever the block normally drops; blocks that drop nothing by themselves (glass, leaves...) drop themselves.
+				List<net.minecraft.item.ItemStack> drops = net.minecraft.block.Block.getDroppedStacks(state, world, pos, null, player, net.minecraft.item.ItemStack.EMPTY);
+				if (drops.isEmpty() && state.getBlock().asItem() != net.minecraft.item.Items.AIR) drops = List.of(new net.minecraft.item.ItemStack(state.getBlock()));
+				world.breakBlock(pos, false, player);
+				for (net.minecraft.item.ItemStack stack : drops) net.minecraft.block.Block.dropStack(world, pos, stack);
 			}
 		});
 	}
@@ -310,3 +379,4 @@ final class HitService {
 			SoundCategory.PLAYERS, 0.8f, 1.0f);
 	}
 }
+

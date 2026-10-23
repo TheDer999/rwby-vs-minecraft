@@ -667,8 +667,15 @@ public class GrimmMcClient implements ClientModInitializer {
 	/** Dirt left in each layer (z offset 2 to 7) of the wall. */
 	static String layers(MinecraftClient client) {
 		StringBuilder sb = new StringBuilder();
-		for (int z = 2; z <= 7; z++) sb.append(solidCount(client, "dirt", -1, 0, z, 1, 2, z)).append(z < 7 ? "/" : "");
+		for (int z = 2; z <= 7; z++) { int c = 0; for (int x = -1; x <= 1; x++) for (int y = 0; y <= 2; y++) if (!blockAt(client, x, y, z).equals("air")) c++; sb.append(c).append(z < 7 ? "/" : ""); }
 		return sb.toString();
+	}
+
+	/** The item entities lying around, as name x count. */
+	static String dropped(MinecraftClient client) {
+		java.util.Map<String, Integer> m = new java.util.TreeMap<>();
+		for (net.minecraft.entity.Entity e : client.world.getEntities()) if (e instanceof net.minecraft.entity.ItemEntity ie) m.merge(ie.getStack().getItem().getTranslationKey().replace("block.minecraft.", "").replace("item.minecraft.", ""), ie.getStack().getCount(), Integer::sum);
+		return m.toString();
 	}
 
 	/** Which blocks of the dirt column at z offset 4 to 9 are still there (D) or gone (.). */
@@ -708,15 +715,17 @@ public class GrimmMcClient implements ClientModInitializer {
 		if (n == 220 && net != null) {
 			var b = p.getBlockPos();
 			breakBase = b;
-			net.sendChatCommand("fill " + (b.getX() - 1) + " " + b.getY() + " " + (b.getZ() + 2) + " " + (b.getX() + 1) + " " + (b.getY() + 2) + " " + (b.getZ() + 7) + " minecraft:dirt");
+			String[] mats = {"dirt", "stone", "obsidian", "sand", "glass", "oak_log"};
+				for (int z = 0; z < mats.length; z++) net.sendChatCommand("fill " + (b.getX() - 1) + " " + b.getY() + " " + (b.getZ() + 2 + z) + " " + (b.getX() + 1) + " " + (b.getY() + 2) + " " + (b.getZ() + 2 + z) + " minecraft:" + mats[z]);
 			net.sendChatCommand("setblock " + (b.getX() + 3) + " " + b.getY() + " " + (b.getZ() + 2) + " minecraft:stone");
 		}
 		if (n == 228) LOG.info("BREAK-TEST wall before: dirt={} layers={} stone={} floorUnderfoot={}", solidCount(client, "dirt", -1, 0, 2, 1, 2, 7), layers(client), blockAt(client, 3, 0, 2), blockAt(client, 0, -1, 0));
-		for (int c : new int[] {235, 246, 257}) {
+		for (int c : new int[] {235, 246, 257, 268}) {
 			if (n == c) o.attackKey.setPressed(true);
 			if (n == c + 1) o.attackKey.setPressed(false);
 			if (n == c + 8) LOG.info("BREAK-TEST after light attack {}: dirt left={} layers={} clip={}", (c - 235) / 11 + 1, solidCount(client, "dirt", -1, 0, 2, 1, 2, 7), layers(client), combat == null ? null : combat.clipName());
 		}
+		if (n == 300) LOG.info("BREAK-TEST items dropped: {}", dropped(client));
 		if (n == 300) LOG.info("BREAK-TEST end of lights: layers={} stone={} floorUnderfoot={}", layers(client), blockAt(client, 3, 0, 2), blockAt(client, 0, -1, 0));
 		// three aimed shots at a column of dirt: one, two, then three blocks deep
 		if (n == 305 && net != null) {
@@ -1055,3 +1064,4 @@ public class GrimmMcClient implements ClientModInitializer {
 			.normal(entry, nx, ny, nz);
 	}
 }
+
