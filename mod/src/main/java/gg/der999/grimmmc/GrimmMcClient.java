@@ -157,6 +157,7 @@ public class GrimmMcClient implements ClientModInitializer {
 				else if (AUTO_MODE.equals("media")) autoMedia(client);
 				else if (AUTO_MODE.equals("fight")) autoFight(client);
 				else if (AUTO_MODE.equals("move")) autoMove(client);
+				else if (AUTO_MODE.equals("break")) autoBreak(client);
 				else if (AUTO_MODE.equals("placed")) autoStep(client);
 			}
 			if (place != null) while (place.wasPressed()) placeRuby(client);
@@ -649,6 +650,61 @@ public class GrimmMcClient implements ClientModInitializer {
 		}
 		if (n == 400) logPig(client, "pig after light combo");
 		if (n == 405) client.scheduleStop();
+	}
+
+	static net.minecraft.util.math.BlockPos breakBase;
+
+	static String blockAt(MinecraftClient client, int dx, int dy, int dz) {
+		return client.world.getBlockState(breakBase.add(dx, dy, dz)).getBlock().getTranslationKey().replace("block.minecraft.", "");
+	}
+
+	static int solidCount(MinecraftClient client, String name, int x0, int y0, int z0, int x1, int y1, int z1) {
+		int c = 0;
+		for (int x = x0; x <= x1; x++) for (int y = y0; y <= y1; y++) for (int z = z0; z <= z1; z++) if (blockAt(client, x, y, z).equals(name)) c++;
+		return c;
+	}
+
+	/** Block breaking self test: a charged heavy at a dirt block under the crosshair, then the third light attack against a dirt wall. */
+	static void autoBreak(MinecraftClient client) {
+		autoTicks++;
+		int n = autoTicks;
+		var p = client.player;
+		var net = p.networkHandler;
+		var o = client.options;
+		if (n >= 90 && n < 360) { p.setYaw(0f); p.setPitch(0f); }
+		if (n == 100) togglePossess(client);
+		if (n == 104 && net != null) net.sendChatCommand("gamemode survival");
+		if (n == 106) {
+			breakBase = p.getBlockPos();
+			var b = breakBase;
+			if (net != null) {
+				net.sendChatCommand("setblock " + b.getX() + " " + (b.getY() + 1) + " " + (b.getZ() + 6) + " minecraft:dirt");
+				net.sendChatCommand("setblock " + b.getX() + " " + (b.getY() + 1) + " " + (b.getZ() + 7) + " minecraft:dirt");
+				net.sendChatCommand("setblock " + (b.getX() + 2) + " " + (b.getY() + 1) + " " + (b.getZ() + 6) + " minecraft:stone");
+				net.sendChatCommand("setblock " + (b.getX() + 1) + " " + (b.getY() + 1) + " " + (b.getZ() + 6) + " minecraft:dirt");
+				net.sendChatCommand("setblock " + b.getX() + " " + (b.getY() + 1) + " " + (b.getZ() + 12) + " minecraft:dirt");
+			}
+		}
+		if (n == 112) LOG.info("BREAK-TEST before heavy: near dirt={} side dirt={} far dirt={} distant dirt={} stone={}", blockAt(client, 0, 1, 6), blockAt(client, 1, 1, 6), blockAt(client, 0, 1, 7), blockAt(client, 0, 1, 12), blockAt(client, 2, 1, 6));
+		// hold the heavy button long enough for a full charge, then release
+		if (n == 115) o.useKey.setPressed(true);
+		if (n == 175) o.useKey.setPressed(false);
+		if (n == 215) LOG.info("BREAK-TEST after charged heavy: near={} side={} far={} distant={} stone={}", blockAt(client, 0, 1, 6), blockAt(client, 1, 1, 6), blockAt(client, 0, 1, 7), blockAt(client, 0, 1, 12), blockAt(client, 2, 1, 6));
+		// a dirt wall in front of her, plus stone and sand right beside it that must stay
+		if (n == 220 && net != null) {
+			var b = p.getBlockPos();
+			breakBase = b;
+			net.sendChatCommand("fill " + (b.getX() - 1) + " " + b.getY() + " " + (b.getZ() + 2) + " " + (b.getX() + 1) + " " + (b.getY() + 2) + " " + (b.getZ() + 2) + " minecraft:dirt");
+			net.sendChatCommand("setblock " + (b.getX() + 3) + " " + b.getY() + " " + (b.getZ() + 2) + " minecraft:stone");
+		}
+		if (n == 228) LOG.info("BREAK-TEST wall before: dirt={} stone={} floorUnderfoot={}", solidCount(client, "dirt", -1, 0, 2, 1, 2, 2), blockAt(client, 3, 0, 2), blockAt(client, 0, -1, 0));
+		for (int c : new int[] {235, 246, 257}) {
+			if (n == c) o.attackKey.setPressed(true);
+			if (n == c + 1) o.attackKey.setPressed(false);
+			if (n == c + 8) LOG.info("BREAK-TEST after light attack {}: dirt left={} clip={}", (c - 235) / 11 + 1, solidCount(client, "dirt", -1, 0, 2, 1, 2, 2), combat == null ? null : combat.clipName());
+		}
+		if (n == 300) LOG.info("BREAK-TEST end: dirt left={} stone={} floorUnderfoot={}", solidCount(client, "dirt", -1, 0, 2, 1, 2, 2), blockAt(client, 3, 0, 2), blockAt(client, 0, -1, 0));
+		if (n == 305) client.scheduleStop();
 	}
 
 	static void logPig(MinecraftClient client, String label) {

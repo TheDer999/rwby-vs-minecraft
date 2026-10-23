@@ -180,7 +180,7 @@ final class Moves {
 			return new Move(a, a.clipPrimary)
 				.at(0f, c -> { c.push(20f); c.reorient(); })
 				.at(0.2f, c -> c.stopPush())
-				.at(0.3f, c -> c.hit(0))
+				.at(0.3f, c -> { c.hit(0); c.breakAtCrosshair(); })
 				.end(0.3f);
 		}
 		return new Move(a, a.clipSecondary)

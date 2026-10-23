@@ -587,10 +587,17 @@ public final class CombatController {
 		actionFree = true;
 	}
 
+	/** The fully charged heavy attack breaks the dirt in its swing and around where the crosshair lands. */
+	void breakAtCrosshair() {
+		HitService.breakHeavy(MinecraftClient.getInstance(), this, move == null ? null : move.ability.attacks[0]);
+	}
+
 	void hit(int slot) {
 		CombatData.Attack atk = move == null ? null : move.ability.attacks[slot];
 		MinecraftClient client = MinecraftClient.getInstance();
 		HitService.hit(client, this, atk);
+		// The third attack of the ground light combo (three hits) also breaks the dirt in its reach.
+		if (move != null && "LightCombo_02".equals(move.ability.coroutine)) HitService.breakInSphere(client, this, atk);
 		if (atk != null && atk.hit != null) Fx.swipe(facingYaw, atk.hit.damage);
 	}
 

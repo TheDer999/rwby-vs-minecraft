@@ -42,10 +42,12 @@ final class GrimmConfig {
 	final float jumpHeight;
 	/** Seconds the aura takes to refill once it starts recharging (config key aura_recharge_seconds; Grimm Eclipse uses 2). */
 	final float auraRechargeSeconds;
+	/** Whether the third light attack and the charged heavy break dirt blocks (config key break_blocks, default true). */
+	final boolean breakBlocks;
 	/** Enables the developer keys (animation browser, placed Ruby) (config key debug=true). */
 	final boolean debug;
 
-	private GrimmConfig(Path home, Path dataDir, String geDir, Path converter, float damageScale, float knockbackScale, boolean hitAllMobs, float auraMax, float auraRechargeSeconds, boolean geSounds, float soundVolume, float jumpHeight, boolean debug) {
+	private GrimmConfig(Path home, Path dataDir, String geDir, Path converter, float damageScale, float knockbackScale, boolean hitAllMobs, float auraMax, float auraRechargeSeconds, boolean geSounds, float soundVolume, float jumpHeight, boolean breakBlocks, boolean debug) {
 		this.home = home;
 		this.dataDir = dataDir;
 		this.geDir = geDir;
@@ -58,6 +60,7 @@ final class GrimmConfig {
 		this.soundVolume = soundVolume;
 		this.jumpHeight = jumpHeight;
 		this.auraRechargeSeconds = auraRechargeSeconds;
+		this.breakBlocks = breakBlocks;
 		this.debug = debug;
 	}
 
@@ -105,6 +108,7 @@ final class GrimmConfig {
 			!"false".equalsIgnoreCase(p.getProperty("ge_sounds", "true").trim()),
 			Math.max(0f, number(p, "sound_volume", 1f)),
 			Math.max(1f, Math.min(8f, number(p, "jump_height", 3f))),
+			!"false".equalsIgnoreCase(p.getProperty("break_blocks", "true").trim()),
 			"true".equalsIgnoreCase(p.getProperty("debug", "false").trim()));
 	}
 }

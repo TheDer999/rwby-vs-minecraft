@@ -70,6 +70,85 @@ final class HitService {
 		deliver(client, p, targets, fwd, atk.hit);
 	}
 
+	/** Dirt, grass and the like: the only blocks Ruby's attacks break. */
+	static boolean isBreakable(net.minecraft.block.BlockState state) {
+		return state.isIn(net.minecraft.registry.tag.BlockTags.DIRT)
+			|| state.isOf(net.minecraft.block.Blocks.FARMLAND) || state.isOf(net.minecraft.block.Blocks.DIRT_PATH);
+	}
+
+	/** Adds the dirt inside an attack's hit sphere, but never the ground Ruby stands on (blocks below her feet are spared). */
+	private static void collectSphere(MinecraftClient client, CombatController combat, CombatData.Attack atk, List<net.minecraft.util.math.BlockPos> found) {
+		PlayerEntity p = client.player;
+		if (atk == null || !atk.hasVolume) return;
+		float yawRad = combat.facingYaw() * MathHelper.RADIANS_PER_DEGREE;
+		Vec3d fwd = new Vec3d(-MathHelper.sin(yawRad), 0, MathHelper.cos(yawRad));
+		Vec3d right = new Vec3d(-MathHelper.cos(yawRad), 0, -MathHelper.sin(yawRad));
+		float s = CombatController.SCALE;
+		Vec3d center = p.getPos().add(right.multiply(atk.offset[0] * s)).add(0, atk.offset[1] * s, 0).add(fwd.multiply(atk.offset[2] * s));
+		collectAround(client, center, atk.radius * s, MathHelper.floor(p.getY() + 0.01), found);
+	}
+
+	/** Adds the breakable blocks whose centres lie within the radius of the point, none below minY, up to 40 in all. */
+	private static void collectAround(MinecraftClient client, Vec3d center, double radius, int minY, List<net.minecraft.util.math.BlockPos> found) {
+		for (net.minecraft.util.math.BlockPos pos : net.minecraft.util.math.BlockPos.iterate(
+				MathHelper.floor(center.x - radius), Math.max(minY, MathHelper.floor(center.y - radius)), MathHelper.floor(center.z - radius),
+				MathHelper.floor(center.x + radius), MathHelper.floor(center.y + radius), MathHelper.floor(center.z + radius))) {
+			if (found.size() >= 40) return;
+			if (pos.getSquaredDistance(center.x - 0.5, center.y - 0.5, center.z - 0.5) > radius * radius) continue;
+			if (isBreakable(client.world.getBlockState(pos)) && !found.contains(pos)) found.add(pos.toImmutable());
+		}
+	}
+
+	/** Breaks the dirt inside an attack's hit sphere. */
+	static void breakInSphere(MinecraftClient client, CombatController combat, CombatData.Attack atk) {
+		PlayerEntity p = client.player;
+		if (!GrimmMcClient.CONFIG.breakBlocks || p == null || client.world == null) return;
+		List<net.minecraft.util.math.BlockPos> found = new ArrayList<>();
+		collectSphere(client, combat, atk, found);
+		breakAll(client, p, found);
+	}
+
+	/**
+	 * The charged heavy's break: the dirt inside the attack's own hit sphere (the swing), plus everything within 2 blocks of where
+	 * the crosshair lands, up to 10 blocks away, so it does not have to be aimed at a single block. The ground right under Ruby is spared.
+	 */
+	static void breakHeavy(MinecraftClient client, CombatController combat, CombatData.Attack atk) {
+		PlayerEntity p = client.player;
+		if (!GrimmMcClient.CONFIG.breakBlocks || p == null || client.world == null) return;
+		List<net.minecraft.util.math.BlockPos> found = new ArrayList<>();
+		collectSphere(client, combat, atk, found);
+		Camera camera = client.gameRenderer.getCamera();
+		float cy = camera.getYaw() * MathHelper.RADIANS_PER_DEGREE, cp = camera.getPitch() * MathHelper.RADIANS_PER_DEGREE;
+		Vec3d dir = new Vec3d(-MathHelper.sin(cy) * MathHelper.cos(cp), -MathHelper.sin(cp), MathHelper.cos(cy) * MathHelper.cos(cp));
+		Vec3d from = camera.getPos();
+		BlockHitResult block = client.world.raycast(new RaycastContext(from, from.add(dir.multiply(10)), RaycastContext.ShapeType.OUTLINE, RaycastContext.FluidHandling.NONE, p));
+		if (block.getType() == HitResult.Type.BLOCK) {
+			List<net.minecraft.util.math.BlockPos> burst = new ArrayList<>();
+			collectAround(client, block.getPos(), 2.0, Integer.MIN_VALUE / 2, burst);
+			int floorY = MathHelper.floor(p.getY() + 0.01);
+			for (net.minecraft.util.math.BlockPos pos : burst) {
+				boolean underRuby = pos.getY() < floorY && Math.hypot(pos.getX() + 0.5 - p.getX(), pos.getZ() + 0.5 - p.getZ()) < 2.0;
+				if (!underRuby && !found.contains(pos) && found.size() < 40) found.add(pos);
+			}
+		}
+		breakAll(client, p, found);
+	}
+
+	private static void breakAll(MinecraftClient client, PlayerEntity p, List<net.minecraft.util.math.BlockPos> positions) {
+		MinecraftServer server = client.getServer();
+		if (server == null || positions.isEmpty()) return;
+		UUID playerId = p.getUuid();
+		RegistryKey<World> dim = client.world.getRegistryKey();
+		server.execute(() -> {
+			ServerWorld world = server.getWorld(dim);
+			ServerPlayerEntity player = server.getPlayerManager().getPlayer(playerId);
+			if (world == null || player == null) return;
+			for (net.minecraft.util.math.BlockPos pos : positions) {
+				if (isBreakable(world.getBlockState(pos)) && world.canPlayerModifyAt(player, pos)) world.breakBlock(pos, true, player);
+			}
+		});
+	}
+
 	/** A ranged hit: a hitscan along the aim line (target centre, or where Ruby looks), stopped by blocks. */
 	static void shoot(MinecraftClient client, CombatController combat, CombatData.Hit h, Entity aim) {
 		PlayerEntity p = client.player;
