@@ -76,16 +76,50 @@ final class HitService {
 			|| state.isOf(net.minecraft.block.Blocks.FARMLAND) || state.isOf(net.minecraft.block.Blocks.DIRT_PATH);
 	}
 
-	/** Adds the dirt inside an attack's hit sphere, but never the ground Ruby stands on (blocks below her feet are spared). */
-	private static void collectSphere(MinecraftClient client, CombatController combat, CombatData.Attack atk, List<net.minecraft.util.math.BlockPos> found) {
+	/**
+	 * Adds the dirt along an attack's swing, a given number of blocks deep. Parallel rays cross the attack's hit sphere in Ruby's facing
+	 * direction; each takes the first `depth` breakable blocks it meets and stops at anything solid it cannot break. Blocks below
+	 * her feet are spared, so she never digs her own floor away.
+	 */
+	private static void collectSphere(MinecraftClient client, CombatController combat, CombatData.Attack atk, int depth, List<net.minecraft.util.math.BlockPos> found) {
 		PlayerEntity p = client.player;
-		if (atk == null || !atk.hasVolume) return;
+		if (atk == null || !atk.hasVolume || depth <= 0) return;
 		float yawRad = combat.facingYaw() * MathHelper.RADIANS_PER_DEGREE;
 		Vec3d fwd = new Vec3d(-MathHelper.sin(yawRad), 0, MathHelper.cos(yawRad));
 		Vec3d right = new Vec3d(-MathHelper.cos(yawRad), 0, -MathHelper.sin(yawRad));
 		float s = CombatController.SCALE;
 		Vec3d center = p.getPos().add(right.multiply(atk.offset[0] * s)).add(0, atk.offset[1] * s, 0).add(fwd.multiply(atk.offset[2] * s));
-		collectAround(client, center, atk.radius * s, MathHelper.floor(p.getY() + 0.01), found);
+		double radius = atk.radius * s;
+		int floorY = MathHelper.floor(p.getY() + 0.01);
+		for (double u = -radius; u <= radius + 1e-6; u += 0.5) {
+			for (double v = -radius; v <= radius + 1e-6; v += 0.5) {
+				if (u * u + v * v > radius * radius) continue;
+				Vec3d start = center.subtract(fwd.multiply(radius)).add(right.multiply(u)).add(0, v, 0);
+				// the swing must touch the dirt inside its sphere; from there the ray goes on until it has `depth` blocks
+				drill(client, start, fwd, radius * 2, radius * 2 + depth + 1, depth, floorY, found);
+			}
+		}
+	}
+
+	/** Walks a line and adds up to `depth` breakable blocks along it; it ends at the first solid block that cannot be broken. */
+	private static void drill(MinecraftClient client, Vec3d start, Vec3d dir, double contactReach, double length, int depth, int minY, List<net.minecraft.util.math.BlockPos> found) {
+		int count = 0;
+		net.minecraft.util.math.BlockPos last = null;
+		for (double t = 0; t <= length && count < depth && found.size() < 40; t += 0.25) {
+			if (count == 0 && t > contactReach) break; // nothing breakable within reach of the swing
+			Vec3d at = start.add(dir.multiply(t));
+			net.minecraft.util.math.BlockPos pos = net.minecraft.util.math.BlockPos.ofFloored(at);
+			if (pos.equals(last)) continue;
+			last = pos;
+			if (pos.getY() < minY) continue;
+			net.minecraft.block.BlockState state = client.world.getBlockState(pos);
+			if (isBreakable(state)) {
+				count++;
+				if (!found.contains(pos)) found.add(pos.toImmutable());
+			} else if (!state.getCollisionShape(client.world, pos).isEmpty()) {
+				break;
+			}
+		}
 	}
 
 	/** Adds the breakable blocks whose centres lie within the radius of the point, none below minY, up to 40 in all. */
@@ -99,12 +133,12 @@ final class HitService {
 		}
 	}
 
-	/** Breaks the dirt inside an attack's hit sphere. */
-	static void breakInSphere(MinecraftClient client, CombatController combat, CombatData.Attack atk) {
+	/** Breaks the dirt along an attack's swing, `depth` blocks deep. */
+	static void breakInSphere(MinecraftClient client, CombatController combat, CombatData.Attack atk, int depth) {
 		PlayerEntity p = client.player;
 		if (!GrimmMcClient.CONFIG.breakBlocks || p == null || client.world == null) return;
 		List<net.minecraft.util.math.BlockPos> found = new ArrayList<>();
-		collectSphere(client, combat, atk, found);
+		collectSphere(client, combat, atk, depth, found);
 		breakAll(client, p, found);
 	}
 
@@ -116,7 +150,7 @@ final class HitService {
 		PlayerEntity p = client.player;
 		if (!GrimmMcClient.CONFIG.breakBlocks || p == null || client.world == null) return;
 		List<net.minecraft.util.math.BlockPos> found = new ArrayList<>();
-		collectSphere(client, combat, atk, found);
+		collectSphere(client, combat, atk, 6, found);
 		Camera camera = client.gameRenderer.getCamera();
 		float cy = camera.getYaw() * MathHelper.RADIANS_PER_DEGREE, cp = camera.getPitch() * MathHelper.RADIANS_PER_DEGREE;
 		Vec3d dir = new Vec3d(-MathHelper.sin(cy) * MathHelper.cos(cp), -MathHelper.sin(cp), MathHelper.cos(cy) * MathHelper.cos(cp));
@@ -150,7 +184,7 @@ final class HitService {
 	}
 
 	/** A ranged hit: a hitscan along the aim line (target centre, or where Ruby looks), stopped by blocks. */
-	static void shoot(MinecraftClient client, CombatController combat, CombatData.Hit h, Entity aim) {
+	static void shoot(MinecraftClient client, CombatController combat, CombatData.Hit h, Entity aim, int breakDepth) {
 		PlayerEntity p = client.player;
 		if (p == null || client.world == null || h == null) return;
 		// Aim like a third-person shooter: what the crosshair points at (seen from the camera) is where the shot goes,
@@ -182,6 +216,16 @@ final class HitService {
 		for (double s = 0.8; s < len; s += 0.8) {
 			Vec3d at = eye.add(dir.multiply(s));
 			client.world.addParticle(ParticleTypes.CRIT, at.x, at.y, at.z, 0, 0, 0);
+		}
+		// A shot digs into dirt along its line like a light attack: one block deep for the first shot, two, then three.
+		if (breakDepth > 0 && GrimmMcClient.CONFIG.breakBlocks) {
+			List<net.minecraft.util.math.BlockPos> dug = new ArrayList<>();
+			double shotLength = Math.min(80.0, best != null ? len : len + breakDepth + 0.5);
+			drill(client, eye, dir, shotLength, shotLength, breakDepth, Integer.MIN_VALUE / 2, dug);
+			int floorY = MathHelper.floor(p.getY() + 0.01);
+			// spare the ground right under Ruby
+			dug.removeIf(pos -> pos.getY() < floorY && Math.hypot(pos.getX() + 0.5 - p.getX(), pos.getZ() + 0.5 - p.getZ()) < 2.0);
+			breakAll(client, p, dug);
 		}
 		if (best != null) {
 			List<UUID> one = new ArrayList<>();

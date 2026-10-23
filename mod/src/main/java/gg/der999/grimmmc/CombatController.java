@@ -345,6 +345,7 @@ public final class CombatController {
 		// GE: SetAttack
 		queued = Action.NONE;
 		if (ability.resetCombo) { combo[0] = 0; combo[1] = 0; }
+		moveIndex = combo[ability.comboType]; // which step of its combo this move is (the first, second, third)
 		if (ability.increaseCombo) combo[ability.comboType]++;
 		if (ability.uninterruptible) uninterruptible = true;
 		if (!canDodge) { invulnerableLeft = 0f; canDodge = true; } // starting an attack ends a dodge early
@@ -506,7 +507,8 @@ public final class CombatController {
 
 	void shoot(int slot) {
 		CombatData.Attack atk = move == null ? null : move.ability.attacks[slot];
-		if (atk != null) HitService.shoot(MinecraftClient.getInstance(), this, atk.hit, target);
+		if (GrimmMcClient.AUTO || GrimmMcClient.CONFIG.debug) GrimmMcClient.LOG.info("shot: move {} step {}", move.ability.coroutine, moveIndex);
+		if (atk != null) HitService.shoot(MinecraftClient.getInstance(), this, atk.hit, target, Math.min(3, moveIndex + 1));
 		Fx.shot(false);
 	}
 
@@ -519,7 +521,7 @@ public final class CombatController {
 		h.damage = atk.hit.damage * 3f;
 		h.knockBack = atk.hit.knockBack * 3f;
 		h.hitTime = atk.hit.hitTime;
-		HitService.shoot(MinecraftClient.getInstance(), this, h, target);
+		HitService.shoot(MinecraftClient.getInstance(), this, h, target, 3);
 		Fx.shot(true);
 	}
 
@@ -587,17 +589,37 @@ public final class CombatController {
 		actionFree = true;
 	}
 
+	private int moveIndex;
+	private Move breakMove;
+
 	/** The fully charged heavy attack breaks the dirt in its swing and around where the crosshair lands. */
 	void breakAtCrosshair() {
 		HitService.breakHeavy(MinecraftClient.getInstance(), this, move == null ? null : move.ability.attacks[0]);
+	}
+
+	/** How many blocks deep the current attack digs into dirt: 1, 2, 3 for the lights of a combo, twice that for its heavies, 0 for the rest. */
+	private int breakDepth() {
+		if (move == null) return 0;
+		String c = move.ability.coroutine;
+		int step = c.length() > 2 && Character.isDigit(c.charAt(c.length() - 1)) ? c.charAt(c.length() - 1) - '0' : 0;
+		if (c.startsWith("LightCombo")) return Math.min(3, step + 1);
+		if (c.equals("HeavyComboFinal")) return 6;
+		if (c.equals("HeavyComboAir")) return 4;
+		if (c.startsWith("HeavyCombo")) return Math.min(6, 2 * (step + 1));
+		return 0;
 	}
 
 	void hit(int slot) {
 		CombatData.Attack atk = move == null ? null : move.ability.attacks[slot];
 		MinecraftClient client = MinecraftClient.getInstance();
 		HitService.hit(client, this, atk);
-		// The third attack of the ground light combo (three hits) also breaks the dirt in its reach.
-		if (move != null && "LightCombo_02".equals(move.ability.coroutine)) HitService.breakInSphere(client, this, atk);
+		// Each attack of a combo digs into dirt along its swing, once per move.
+		int depth = breakDepth();
+		if (move != null && "Heavy".equals(move.ability.coroutine) && slot == 1) depth = 2; // the uncharged heavy
+		if (depth > 0 && breakMove != move) {
+			breakMove = move;
+			HitService.breakInSphere(client, this, atk, depth);
+		}
 		if (atk != null && atk.hit != null) Fx.swipe(facingYaw, atk.hit.damage);
 	}
 

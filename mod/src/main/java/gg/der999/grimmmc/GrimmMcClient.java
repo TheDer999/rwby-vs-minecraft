@@ -664,6 +664,20 @@ public class GrimmMcClient implements ClientModInitializer {
 		return c;
 	}
 
+	/** Dirt left in each layer (z offset 2 to 7) of the wall. */
+	static String layers(MinecraftClient client) {
+		StringBuilder sb = new StringBuilder();
+		for (int z = 2; z <= 7; z++) sb.append(solidCount(client, "dirt", -1, 0, z, 1, 2, z)).append(z < 7 ? "/" : "");
+		return sb.toString();
+	}
+
+	/** Which blocks of the dirt column at z offset 4 to 9 are still there (D) or gone (.). */
+	static String column(MinecraftClient client) {
+		StringBuilder sb = new StringBuilder();
+		for (int z = 4; z <= 9; z++) sb.append(blockAt(client, 0, 1, z).equals("dirt") ? 'D' : '.');
+		return sb.toString();
+	}
+
 	/** Block breaking self test: a charged heavy at a dirt block under the crosshair, then the third light attack against a dirt wall. */
 	static void autoBreak(MinecraftClient client) {
 		autoTicks++;
@@ -694,17 +708,33 @@ public class GrimmMcClient implements ClientModInitializer {
 		if (n == 220 && net != null) {
 			var b = p.getBlockPos();
 			breakBase = b;
-			net.sendChatCommand("fill " + (b.getX() - 1) + " " + b.getY() + " " + (b.getZ() + 2) + " " + (b.getX() + 1) + " " + (b.getY() + 2) + " " + (b.getZ() + 2) + " minecraft:dirt");
+			net.sendChatCommand("fill " + (b.getX() - 1) + " " + b.getY() + " " + (b.getZ() + 2) + " " + (b.getX() + 1) + " " + (b.getY() + 2) + " " + (b.getZ() + 7) + " minecraft:dirt");
 			net.sendChatCommand("setblock " + (b.getX() + 3) + " " + b.getY() + " " + (b.getZ() + 2) + " minecraft:stone");
 		}
-		if (n == 228) LOG.info("BREAK-TEST wall before: dirt={} stone={} floorUnderfoot={}", solidCount(client, "dirt", -1, 0, 2, 1, 2, 2), blockAt(client, 3, 0, 2), blockAt(client, 0, -1, 0));
+		if (n == 228) LOG.info("BREAK-TEST wall before: dirt={} layers={} stone={} floorUnderfoot={}", solidCount(client, "dirt", -1, 0, 2, 1, 2, 7), layers(client), blockAt(client, 3, 0, 2), blockAt(client, 0, -1, 0));
 		for (int c : new int[] {235, 246, 257}) {
 			if (n == c) o.attackKey.setPressed(true);
 			if (n == c + 1) o.attackKey.setPressed(false);
-			if (n == c + 8) LOG.info("BREAK-TEST after light attack {}: dirt left={} clip={}", (c - 235) / 11 + 1, solidCount(client, "dirt", -1, 0, 2, 1, 2, 2), combat == null ? null : combat.clipName());
+			if (n == c + 8) LOG.info("BREAK-TEST after light attack {}: dirt left={} layers={} clip={}", (c - 235) / 11 + 1, solidCount(client, "dirt", -1, 0, 2, 1, 2, 7), layers(client), combat == null ? null : combat.clipName());
 		}
-		if (n == 300) LOG.info("BREAK-TEST end: dirt left={} stone={} floorUnderfoot={}", solidCount(client, "dirt", -1, 0, 2, 1, 2, 2), blockAt(client, 3, 0, 2), blockAt(client, 0, -1, 0));
-		if (n == 305) client.scheduleStop();
+		if (n == 300) LOG.info("BREAK-TEST end of lights: layers={} stone={} floorUnderfoot={}", layers(client), blockAt(client, 3, 0, 2), blockAt(client, 0, -1, 0));
+		// three aimed shots at a column of dirt: one, two, then three blocks deep
+		if (n == 305 && net != null) {
+			breakBase = p.getBlockPos();
+			var b = breakBase;
+			net.sendChatCommand("fill " + (b.getX() - 3) + " " + b.getY() + " " + (b.getZ() + 1) + " " + (b.getX() + 3) + " " + (b.getY() + 3) + " " + (b.getZ() + 9) + " minecraft:air");
+		}
+		if (n == 312 && net != null) {
+			var b = breakBase;
+			net.sendChatCommand("fill " + b.getX() + " " + (b.getY() + 1) + " " + (b.getZ() + 4) + " " + b.getX() + " " + (b.getY() + 1) + " " + (b.getZ() + 9) + " minecraft:dirt");
+		}
+		if (n == 320) LOG.info("BREAK-TEST shot column before: {}", column(client));
+		for (int c : new int[] {325, 345, 365}) {
+			if (n == c) o.dropKey.setPressed(true);
+			if (n == c + 4) o.dropKey.setPressed(false);
+			if (n == c + 14) LOG.info("BREAK-TEST after shot {}: {}", (c - 325) / 20 + 1, column(client));
+		}
+		if (n == 400) client.scheduleStop();
 	}
 
 	static void logPig(MinecraftClient client, String label) {
