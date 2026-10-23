@@ -743,7 +743,21 @@ public class GrimmMcClient implements ClientModInitializer {
 			if (n == c + 4) o.dropKey.setPressed(false);
 			if (n == c + 14) LOG.info("BREAK-TEST after shot {}: {}", (c - 325) / 20 + 1, column(client));
 		}
-		if (n == 400) client.scheduleStop();
+		// what each kind of block costs: placed in a row behind her
+		String[] kinds = {"poppy", "torch", "dirt", "oak_planks", "glass", "stone", "iron_block", "chest", "furnace", "obsidian", "ancient_debris", "reinforced_deepslate", "bedrock", "barrier", "command_block", "water", "spawner"};
+		if (n >= 380 && n < 380 + kinds.length && net != null) {
+			var b = breakBase;
+			net.sendChatCommand("setblock " + (b.getX() - 8 + (n - 380)) + " " + (b.getY() + 1) + " " + (b.getZ() - 4) + " minecraft:" + kinds[n - 380]);
+		}
+		if (n == 420) {
+			StringBuilder sb = new StringBuilder();
+			for (int i = 0; i < kinds.length; i++) {
+				var pos = breakBase.add(-8 + i, 1, -4);
+				sb.append(kinds[i]).append('=').append(HitService.cost(client.world, pos, client.world.getBlockState(pos))).append(' ');
+			}
+			LOG.info("BREAK-TEST costs: {}", sb);
+		}
+		if (n == 425) client.scheduleStop();
 	}
 
 	static void logPig(MinecraftClient client, String label) {

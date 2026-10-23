@@ -83,32 +83,21 @@ final class HitService {
 		return 0;
 	}
 
-	/** Whether a block is stone-like: stone, deepslate, ores, bricks, netherrack, obsidian and the like. */
-	private static boolean stoneLike(net.minecraft.block.BlockState state) {
-		net.minecraft.sound.BlockSoundGroup g = state.getSoundGroup();
-		return g == net.minecraft.sound.BlockSoundGroup.STONE || g == net.minecraft.sound.BlockSoundGroup.DEEPSLATE
-			|| g == net.minecraft.sound.BlockSoundGroup.DEEPSLATE_BRICKS || g == net.minecraft.sound.BlockSoundGroup.DEEPSLATE_TILES
-			|| g == net.minecraft.sound.BlockSoundGroup.POLISHED_DEEPSLATE || g == net.minecraft.sound.BlockSoundGroup.TUFF
-			|| g == net.minecraft.sound.BlockSoundGroup.TUFF_BRICKS || g == net.minecraft.sound.BlockSoundGroup.POLISHED_TUFF
-			|| g == net.minecraft.sound.BlockSoundGroup.CALCITE || g == net.minecraft.sound.BlockSoundGroup.BASALT
-			|| g == net.minecraft.sound.BlockSoundGroup.NETHERRACK || g == net.minecraft.sound.BlockSoundGroup.NETHER_BRICKS
-			|| g == net.minecraft.sound.BlockSoundGroup.NETHER_ORE || g == net.minecraft.sound.BlockSoundGroup.ANCIENT_DEBRIS
-			|| state.isIn(net.minecraft.registry.tag.BlockTags.BASE_STONE_OVERWORLD) || state.isIn(net.minecraft.registry.tag.BlockTags.BASE_STONE_NETHER);
-	}
-
 	/**
-	 * How much of an attack's depth a block uses up to break, 0 if Ruby cannot break it. Dirt and its kin, sand, gravel, wood, leaves and
-	 * glass cost 1; stone and the like cost 2 (twice as hard); obsidian and the like cost 3. Blocks that hold something (chests,
-	 * furnaces, spawners), liquids, plants, redstone and anything unbreakable are left alone.
+	 * How much of an attack's depth a block uses up to break, 0 if Ruby cannot break it. Every block can be broken except those Minecraft
+	 * itself makes unbreakable (bedrock, barriers, command blocks, portal frames...) and liquids. The cost follows the block's own hardness:
+	 * 1 for soft blocks and dirt, sand, gravel, wood, leaves and glass; 2 for stone and the like (hardness up to 5); 3 for obsidian and the
+	 * like (up to 50); 4 for the very hardest (reinforced deepslate).
 	 */
 	static int cost(net.minecraft.world.BlockView world, net.minecraft.util.math.BlockPos pos, net.minecraft.block.BlockState state) {
 		if (state.isAir() || !state.getFluidState().isEmpty()) return 0;
-		if (world.getBlockEntity(pos) != null) return 0;
+		float hardness = state.getHardness(world, pos);
+		if (hardness < 0f) return 0; // bedrock, barrier, command blocks, end portal frame...
 		if (state.isIn(net.minecraft.registry.tag.BlockTags.DIRT) || state.isOf(net.minecraft.block.Blocks.FARMLAND)
 			|| state.isOf(net.minecraft.block.Blocks.DIRT_PATH) || bulkKind(state) != 0) return 1;
-		float hardness = state.getHardness(world, pos);
-		if (hardness <= 0f || !stoneLike(state)) return 0;
-		return hardness <= 5f ? 2 : 3;
+		if (hardness <= 1f) return 1;
+		if (hardness <= 5f) return 2;
+		return hardness <= 50f ? 3 : 4;
 	}
 
 	/** Breaking a bulk block (sand, gravel, wood, leaves, glass) also takes up to 8 connected blocks of the same kind within 2 blocks of it. */
@@ -190,9 +179,9 @@ final class HitService {
 				MathHelper.floor(center.x + radius), MathHelper.floor(center.y + radius), MathHelper.floor(center.z + radius))) {
 			if (found.size() >= 40) return;
 			if (pos.getSquaredDistance(center.x - 0.5, center.y - 0.5, center.z - 0.5) > radius * radius) continue;
-			// the crosshair burst only takes what costs 1 or 2 (not obsidian)
+			// the crosshair burst takes whatever costs up to 3 (not the very hardest)
 			int c = cost(client.world, pos, client.world.getBlockState(pos));
-			if (c > 0 && c <= 2 && !found.contains(pos)) found.add(pos.toImmutable());
+			if (c > 0 && c <= 3 && !found.contains(pos)) found.add(pos.toImmutable());
 		}
 	}
 
@@ -202,6 +191,7 @@ final class HitService {
 		if (!GrimmMcClient.CONFIG.breakBlocks || p == null || client.world == null) return;
 		List<net.minecraft.util.math.BlockPos> found = new ArrayList<>();
 		collectSphere(client, combat, atk, depth, found);
+		if (GrimmMcClient.AUTO) GrimmMcClient.LOG.info("break depth {} found {} at yaw {} pos {}", depth, found.size(), combat.facingYaw(), p.getBlockPos());
 		breakAll(client, p, found);
 	}
 
@@ -244,7 +234,7 @@ final class HitService {
 				net.minecraft.block.BlockState state = world.getBlockState(pos);
 				if (cost(world, pos, state) == 0 || !world.canPlayerModifyAt(player, pos)) continue;
 				// Whatever the block normally drops; blocks that drop nothing by themselves (glass, leaves...) drop themselves.
-				List<net.minecraft.item.ItemStack> drops = net.minecraft.block.Block.getDroppedStacks(state, world, pos, null, player, net.minecraft.item.ItemStack.EMPTY);
+				List<net.minecraft.item.ItemStack> drops = net.minecraft.block.Block.getDroppedStacks(state, world, pos, world.getBlockEntity(pos), player, net.minecraft.item.ItemStack.EMPTY);
 				if (drops.isEmpty() && state.getBlock().asItem() != net.minecraft.item.Items.AIR) drops = List.of(new net.minecraft.item.ItemStack(state.getBlock()));
 				world.breakBlock(pos, false, player);
 				for (net.minecraft.item.ItemStack stack : drops) net.minecraft.block.Block.dropStack(world, pos, stack);
