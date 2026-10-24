@@ -10,12 +10,12 @@ enum GrimmKind {
 		new String[] {"Spin Slash", "Joust"}, new float[] {0.97f, 1.6f}, new float[] {0.45f, 0.85f},
 		// per size: width, height, health, damage, speed, digging depth, model scale
 		new float[] {1.0f, 1.5f, 2.2f}, new float[] {1.7f, 2.6f, 4.0f},
-		new double[] {30, 70, 160}, new double[] {5, 8, 14}, new double[] {0.30, 0.31, 0.33}, new int[] {1, 2, 4},
+		new double[] {30, 70, 160}, new double[] {2.5, 4, 7}, new double[] {0.30, 0.31, 0.33}, new int[] {1, 2, 4},
 		new float[] {1.9f, 2.85f, 4.4f}),
 	CREEP("creep", "Idle", "Walk", "Run",
 		new String[] {"Flip"}, new float[] {0.77f}, new float[] {0.40f},
 		new float[] {0.45f, 0.7f, 1.1f}, new float[] {0.45f, 0.65f, 1.0f},
-		new double[] {20, 45, 100}, new double[] {4, 7, 12}, new double[] {0.34, 0.33, 0.32}, new int[] {1, 2, 4},
+		new double[] {20, 45, 100}, new double[] {2, 3.5, 6}, new double[] {0.34, 0.33, 0.32}, new int[] {1, 2, 4},
 		new float[] {0.7f, 1.0f, 1.55f});
 
 	static final String[] SIZE_NAMES = {"small", "medium", "large"};
