@@ -44,10 +44,16 @@ final class GrimmConfig {
 	final float auraRechargeSeconds;
 	/** Whether the third light attack and the charged heavy break dirt blocks (config key break_blocks, default true). */
 	final boolean breakBlocks;
+	/** Whether the Grimm break blocks (config key grimm_break_blocks, default true). */
+	final boolean grimmBreakBlocks;
+	/** Whether Grimm spawn by themselves in the overworld (config key grimm_spawn, default true). /summon always works. */
+	final boolean grimmSpawn;
+	/** Whether blocks players placed are spared by Ruby and the Grimm (config key spare_placed, default false). */
+	final boolean sparePlaced;
 	/** Enables the developer keys (animation browser, placed Ruby) (config key debug=true). */
 	final boolean debug;
 
-	private GrimmConfig(Path home, Path dataDir, String geDir, Path converter, float damageScale, float knockbackScale, boolean hitAllMobs, float auraMax, float auraRechargeSeconds, boolean geSounds, float soundVolume, float jumpHeight, boolean breakBlocks, boolean debug) {
+	private GrimmConfig(Path home, Path dataDir, String geDir, Path converter, float damageScale, float knockbackScale, boolean hitAllMobs, float auraMax, float auraRechargeSeconds, boolean geSounds, float soundVolume, float jumpHeight, boolean breakBlocks, boolean grimmBreakBlocks, boolean grimmSpawn, boolean sparePlaced, boolean debug) {
 		this.home = home;
 		this.dataDir = dataDir;
 		this.geDir = geDir;
@@ -61,6 +67,9 @@ final class GrimmConfig {
 		this.jumpHeight = jumpHeight;
 		this.auraRechargeSeconds = auraRechargeSeconds;
 		this.breakBlocks = breakBlocks;
+		this.grimmBreakBlocks = grimmBreakBlocks;
+		this.grimmSpawn = grimmSpawn;
+		this.sparePlaced = sparePlaced;
 		this.debug = debug;
 	}
 
@@ -109,6 +118,9 @@ final class GrimmConfig {
 			Math.max(0f, number(p, "sound_volume", 1f)),
 			Math.max(1f, Math.min(8f, number(p, "jump_height", 3f))),
 			!"false".equalsIgnoreCase(p.getProperty("break_blocks", "true").trim()),
+			!"false".equalsIgnoreCase(p.getProperty("grimm_break_blocks", "true").trim()),
+			!"false".equalsIgnoreCase(p.getProperty("grimm_spawn", "true").trim()),
+			"true".equalsIgnoreCase(p.getProperty("spare_placed", "false").trim()),
 			"true".equalsIgnoreCase(p.getProperty("debug", "false").trim()));
 	}
 }

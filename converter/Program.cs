@@ -14,7 +14,7 @@ namespace GrimmConvert;
 /// </summary>
 static class Program
 {
-    const string ConverterVersion = "0.3.1";
+    const string ConverterVersion = "0.4.1";
     const string DataFolderPattern = "*_Data";
     const int ExitNotReady = 10;
 
@@ -26,6 +26,9 @@ static class Program
     static readonly Dictionary<string, CharacterSpec> Characters = new()
     {
         ["ruby"] = new CharacterSpec("ruby", "RubyBody_GEO", "Ruby", new[] { "crescentRose_mesh", "crescentRose_gun_mesh" }, "Ruby"),
+        // The Grimm the mod spawns: model, skeleton and animations only (their behaviour is the mod's own).
+        ["beowolf"] = new CharacterSpec("beowolf", "Beowolf_Mesh", "Bip01", Array.Empty<string>(), "Beowolf"),
+        ["creep"] = new CharacterSpec("creep", "Creep Mesh", "Creep Root", Array.Empty<string>(), "Creep", "Creep Body"),
     };
 
     static int Main(string[] args)
@@ -51,12 +54,15 @@ static class Program
 
     static int Run(string[] args)
     {
-        string ge = null, outDir = null, character = "ruby";
+        string ge = null, outDir = null, character = "ruby", list = null, bonesOf = null, smrOf = null;
         bool force = false, check = false;
         for (int i = 0; i < args.Length; i++)
         {
             switch (args[i])
             {
+                case "--list": list = Next(args, ref i); break;
+                case "--bones": bonesOf = Next(args, ref i); break;
+                case "--smr": smrOf = Next(args, ref i); break;
                 case "--ge": ge = Next(args, ref i); break;
                 case "--out": outDir = Next(args, ref i); break;
                 case "--character": character = Next(args, ref i).ToLowerInvariant(); break;
@@ -65,12 +71,15 @@ static class Program
                 default: throw new ConvertException(ExitCodes.Usage, $"Unknown argument '{args[i]}'.");
             }
         }
+        if (list != null && ge != null) return Explore.List(FindDataDir(ge), list);
+        if (bonesOf != null && ge != null) return Explore.Bones(FindDataDir(ge), bonesOf);
+        if (smrOf != null && ge != null) return Explore.Smr(FindDataDir(ge), smrOf);
         if (ge == null || outDir == null)
             throw new ConvertException(ExitCodes.Usage, "Usage: GrimmConvert --ge <Grimm Eclipse folder> --out <output folder> [--force] [--check] [--character ruby]");
         if (!Characters.TryGetValue(character, out var spec))
             throw new ConvertException(ExitCodes.Usage, $"Unknown character '{character}'. Available: {string.Join(", ", Characters.Keys)}.");
 
-        const int total = 8;
+        const int total = 9;
         Progress(1, total, "Looking for Grimm Eclipse");
         var dataDir = FindDataDir(ge);
         var fingerprintFile = new FileInfo(Path.Combine(dataDir, Fingerprinted));
@@ -114,7 +123,29 @@ static class Program
             Progress(7, total, $"Reading {displayName}'s sounds and voice lines");
             var audio = AudioExport.Export(ua, tmp, Info);
 
-            Progress(8, total, "Finishing");
+            Progress(8, total, "Reading the Grimm: Beowolf and Creep");
+            var grimmOut = new List<object>();
+            foreach (var gid in new[] { "beowolf", "creep" })
+            {
+                try
+                {
+                    var gr = Exporters.ExportRig(ua, Characters[gid], Path.Combine(tmp, $"{gid}_rig.json"), Info);
+                    for (int mi = 0; mi < gr.MaterialTextures.Count; mi++)
+                    {
+                        var mt = gr.MaterialTextures[mi];
+                        if (mt == null) continue;
+                        Exporters.ExportTexture(ua, mt.Value.inst, mt.Value.info, Path.Combine(tmp, $"{gid}_texture{mi}.png"));
+                    }
+                    grimmOut.Add(new { id = gid, vertices = gr.Vertices, clips = gr.Clips, textures = gr.MaterialTextures.Count });
+                }
+                catch (Exception e) when (e is ConvertException or IOException or InvalidOperationException or KeyNotFoundException)
+                {
+                    Info($"{gid} skipped: {e.Message}"); // Ruby still works without the Grimm
+                    foreach (var leftover in Directory.GetFiles(tmp, gid + "_*")) File.Delete(leftover);
+                }
+            }
+
+            Progress(9, total, "Finishing");
             var outputs = new List<object>();
             foreach (var f in Directory.GetFiles(tmp).OrderBy(f => f, StringComparer.Ordinal))
             {
@@ -141,6 +172,7 @@ static class Program
                 bodyTexture = new { name = body.Name, width = body.Width, height = body.Height, format = Textures.FormatName(body.Format) },
                 combat = new { abilities = combat.Abilities, roles = combat.Roles },
                 sounds = new { wanted = audio.Wanted, written = audio.Written },
+                grimm = grimmOut,
                 weapon = new { parts = props.Parts, texture = new { name = props.Texture.Name, width = props.Texture.Width, height = props.Texture.Height, format = Textures.FormatName(props.Texture.Format) } },
                 outputs,
             };

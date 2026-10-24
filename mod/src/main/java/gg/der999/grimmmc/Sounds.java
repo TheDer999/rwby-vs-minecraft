@@ -184,6 +184,17 @@ final class Sounds {
 		any("aura_recharge", 0.8f);
 	}
 
+	/** A Grimm's voice at a spot in the world: it fades with the distance from the player and is silent beyond 40 blocks. */
+	static void grimmVoice(String prefix, net.minecraft.util.math.Vec3d at, int size) {
+		if (!active()) return;
+		MinecraftClient c = MinecraftClient.getInstance();
+		if (c.player == null) return;
+		double d = c.player.getPos().distanceTo(at);
+		if (d > 40) return;
+		float v = (float) (1.0 / (1.0 + d / 6.0)) * (0.8f + 0.2f * size);
+		any(prefix, Math.min(1f, v));
+	}
+
 	/** Ruby hurt (called when her aura or health takes damage). */
 	static void hurt() {
 		voice("ruby_hit_", 0.6f);

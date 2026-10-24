@@ -9,6 +9,7 @@
 	"environment": "client",
 	"mixins": ["grimmmc.mixins.json"],
 	"entrypoints": {
+		"main": ["gg.der999.grimmmc.GrimmMcMain"],
 		"client": ["gg.der999.grimmmc.GrimmMcClient"]
 	},
 	"depends": {

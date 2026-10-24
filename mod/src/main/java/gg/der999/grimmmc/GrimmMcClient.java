@@ -25,6 +25,9 @@ import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.RotationAxis;
+import net.minecraft.util.Hand;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
 import org.joml.Matrix4f;
 import org.lwjgl.glfw.GLFW;
@@ -123,6 +126,10 @@ public class GrimmMcClient implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
+		Protection.init();
+		for (net.minecraft.entity.EntityType<GrimmEntity> grimmType : GrimmMcMain.TYPES) {
+			net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry.register(grimmType, GrimmRenderer::new);
+		}
 		// Playing as Ruby uses Minecraft's own inputs (left click, right click, Shift, Space, WASD...); only the toggle is new.
 		KeyBinding possess = key("possess", GLFW.GLFW_KEY_O);
 		// Developer keys, only when debug=true in config.properties.
@@ -158,6 +165,11 @@ public class GrimmMcClient implements ClientModInitializer {
 				else if (AUTO_MODE.equals("fight")) autoFight(client);
 				else if (AUTO_MODE.equals("move")) autoMove(client);
 				else if (AUTO_MODE.equals("break")) autoBreak(client);
+				else if (AUTO_MODE.equals("protect")) autoProtect(client);
+				else if (AUTO_MODE.equals("grimmview")) autoGrimmView(client);
+				else if (AUTO_MODE.equals("grimmwall")) autoGrimmWall(client);
+				else if (AUTO_MODE.equals("grimmfight")) autoGrimmFight(client);
+				else if (AUTO_MODE.equals("grimmspawn")) autoGrimmSpawn(client);
 				else if (AUTO_MODE.equals("placed")) autoStep(client);
 			}
 			if (place != null) while (place.wasPressed()) placeRuby(client);
@@ -385,6 +397,11 @@ public class GrimmMcClient implements ClientModInitializer {
 			return rest;
 		}
 		return amount;
+	}
+
+	/** A player placed a block (called by the mixin on the server thread). */
+	public static void blockPlacedByPlayer(net.minecraft.world.World world, net.minecraft.util.math.BlockPos pos) {
+		Protection.markPlaced(world, pos);
 	}
 
 	/** True when the given player is inside a dodge and must take no damage (read on the integrated server's thread). */
@@ -664,6 +681,172 @@ public class GrimmMcClient implements ClientModInitializer {
 		return c;
 	}
 
+	/** Grimm self test 1: all six Grimm in a row, then a screenshot. */
+	static void autoGrimmView(MinecraftClient client) {
+		autoTicks++;
+		int n = autoTicks;
+		var p = client.player;
+		var net = p.networkHandler;
+		if (n >= 90 && n < 400) { p.setYaw(0f); p.setPitch(8f); }
+		if (n == 92 && net != null) net.sendChatCommand("gamemode creative");
+		if (n == 94 && net != null) net.sendChatCommand("time set noon");
+		if (n == 96 && net != null) {
+			String[] kinds = {"beowolf_small", "beowolf_medium", "beowolf_large"};
+			double[] bx = {-5, -0.5, 4.5};
+			for (int i = 0; i < 3; i++) net.sendChatCommand("summon grimmmc:" + kinds[i] + " ~" + bx[i] + " ~ ~10 {NoAI:1b,Rotation:[180f,0f]}");
+			String[] creeps = {"creep_small", "creep_medium", "creep_large"};
+			double[] cx = {-3.5, 0, 3.5};
+			for (int i = 0; i < 3; i++) net.sendChatCommand("summon grimmmc:" + creeps[i] + " ~" + cx[i] + " ~ ~5 {NoAI:1b,Rotation:[180f,0f]}");
+		}
+		if (n == 130) {
+			int count = 0;
+			for (net.minecraft.entity.Entity e : client.world.getEntities()) if (e instanceof GrimmEntity) count++;
+			LOG.info("GRIMM-TEST {} Grimm in the world, render error: {}", count, renderError);
+		}
+		if (n == 150) shoot(client);
+		if (n == 160 && net != null) net.sendChatCommand("data merge entity @e[type=grimmmc:beowolf_medium,limit=1] {NoAI:0b}");
+		if (n == 170) client.scheduleStop();
+	}
+
+	static int wallBefore;
+
+	/** Grimm self test 2: a medium Beowolf hunts the player through a stone wall; does it dig? */
+	static void autoGrimmWall(MinecraftClient client) {
+		autoTicks++;
+		int n = autoTicks;
+		var p = client.player;
+		var net = p.networkHandler;
+		if (n == 92 && net != null) net.sendChatCommand("gamemode survival");
+		if (n == 93 && net != null) net.sendChatCommand("difficulty normal");
+		if (n == 94 && net != null) net.sendChatCommand("effect give @s minecraft:resistance 600 4 true");
+		if (n == 96) {
+			breakBase = p.getBlockPos();
+			var b = breakBase;
+			if (net != null) {
+				// two stone shells around the player: 2 thick, 3x3 inside
+				net.sendChatCommand("fill " + (b.getX() - 3) + " " + b.getY() + " " + (b.getZ() - 3) + " " + (b.getX() + 3) + " " + (b.getY() + 4) + " " + (b.getZ() + 3) + " minecraft:stone hollow");
+				net.sendChatCommand("fill " + (b.getX() - 2) + " " + b.getY() + " " + (b.getZ() - 2) + " " + (b.getX() + 2) + " " + (b.getY() + 3) + " " + (b.getZ() + 2) + " minecraft:stone hollow");
+				net.sendChatCommand("summon grimmmc:beowolf_medium " + b.getX() + " " + b.getY() + " " + (b.getZ() + 12));
+				net.sendChatCommand("summon grimmmc:beowolf_large " + (b.getX() + 6) + " " + b.getY() + " " + (b.getZ() + 12));
+				net.sendChatCommand("summon grimmmc:creep_small " + (b.getX() - 6) + " " + b.getY() + " " + (b.getZ() + 12));
+			}
+		}		if (n >= 120 && n % 40 == 0 && n <= 700) {
+			int stone = 0;
+			for (int x = -3; x <= 3; x++) for (int y = 0; y <= 4; y++) for (int z = -3; z <= 3; z++) if (blockAt(client, x, y, z).equals("stone")) stone++;
+			StringBuilder sb = new StringBuilder();
+			for (net.minecraft.entity.Entity e : client.world.getEntities()) if (e instanceof GrimmEntity g) sb.append(String.format("[%s z=%.1f x=%.1f hp=%.0f] ", g.getType().getUntranslatedName(), g.getZ() - breakBase.getZ(), g.getX() - breakBase.getX(), g.getHealth()));
+			LOG.info("GRIMM-TEST tick {}: stone left {} playerHp={} {}", n, stone, p.getHealth(), sb);
+		}
+		if (n == 700) client.scheduleStop();
+	}
+	/** Grimm self test 3: Grimm that really fight, with screenshots, to see their attack animations. */
+	static void autoGrimmFight(MinecraftClient client) {
+		autoTicks++;
+		int n = autoTicks;
+		var p = client.player;
+		var net = p.networkHandler;
+		if (n == 92 && net != null) net.sendChatCommand("gamemode survival");
+		if (n == 93 && net != null) net.sendChatCommand("difficulty normal");
+		if (n == 94 && net != null) net.sendChatCommand("effect give @s minecraft:resistance 600 4 true");
+		if (n == 95 && net != null) net.sendChatCommand("time set noon");
+		if (n == 96 && net != null) {
+			net.sendChatCommand("summon grimmmc:beowolf_medium ~-3 ~ ~7");
+			net.sendChatCommand("summon grimmmc:beowolf_large ~4 ~ ~9");
+			net.sendChatCommand("summon grimmmc:creep_medium ~ ~ ~6");
+		}
+		if (n >= 100 && n < 400) { p.setYaw(0f); p.setPitch(10f); }
+		for (int t : new int[] {135, 160, 185, 210, 235, 260}) if (n == t) shoot(client);
+		if (n == 300) {
+			StringBuilder sb = new StringBuilder();
+			for (net.minecraft.entity.Entity e : client.world.getEntities()) if (e instanceof GrimmEntity g) sb.append(String.format("[%s %.1f blocks away, attack %d] ", g.getType().getUntranslatedName(), g.distanceTo(p), g.attackTicks()));
+			LOG.info("GRIMM-TEST fight: playerHp={} sounds started={} failed={} {}", p.getHealth(), Sounds.STARTED.get(), Sounds.FAILED.get(), sb);
+		}
+		if (n == 305) client.scheduleStop();
+	}
+
+	/** Grimm self test 4: how often each size may spawn by day and by night. */
+	static void autoGrimmSpawn(MinecraftClient client) {
+		autoTicks++;
+		int n = autoTicks;
+		var p = client.player;
+		var conn = p.networkHandler;
+		if (n == 92 && conn != null) conn.sendChatCommand("difficulty normal");
+		if (n == 94 && conn != null) conn.sendChatCommand("time set noon");
+		if (n == 120 || n == 160) {
+			boolean night = n == 160;
+			var server = client.getServer();
+			var world = server.getOverworld();
+			var pos = p.getBlockPos();
+			var rnd = net.minecraft.util.math.random.Random.create(7);
+			StringBuilder sb = new StringBuilder();
+			for (GrimmKind kind : GrimmKind.values()) for (int size = 0; size < 3; size++) {
+				var type = GrimmMcMain.TYPES.get(kind.ordinal() * 3 + size);
+				int ok = 0;
+				for (int i = 0; i < 1000; i++) if (GrimmEntity.canSpawn(type, world, net.minecraft.entity.SpawnReason.NATURAL, pos, rnd)) ok++;
+				sb.append(kind.entityName(size)).append('=').append(ok).append("/1000 ");
+			}
+			LOG.info("GRIMM-TEST spawn chances at {} (time {}): {}", night ? "night" : "noon", world.getTimeOfDay() % 24000, sb);
+		}
+		if (n == 130 && conn != null) conn.sendChatCommand("time set night");
+		if (n == 170) client.scheduleStop();
+	}
+	/** Row of blocks two ahead of the base position: names of the three (left, middle, right). */
+	static String row(MinecraftClient client) {
+		return blockAt(client, -1, 0, 2) + "/" + blockAt(client, 0, 0, 2) + "/" + blockAt(client, 1, 0, 2);
+	}
+
+	/** Protection self test: placing a block is remembered; /grimmmc spare-placed and /grimmmc digging change what a light attack breaks. */
+	static void autoProtect(MinecraftClient client) {
+		autoTicks++;
+		int n = autoTicks;
+		var p = client.player;
+		var net = p.networkHandler;
+		var o = client.options;
+		if (n >= 90 && n < 600) { p.setYaw(0f); p.setPitch(0f); }
+		if (n == 92 && net != null) net.sendChatCommand("gamemode survival");
+		if (n == 94 && net != null) net.sendChatCommand("give @s minecraft:dirt 8");
+		if (n == 100) {
+			breakBase = p.getBlockPos();
+			var tgt = breakBase.add(-1, -1, 2); // the grass block under the spot two ahead and one to the left
+			var hit = new BlockHitResult(Vec3d.ofCenter(tgt).add(0, 0.5, 0), Direction.UP, tgt, false);
+			var r = client.interactionManager.interactBlock(p, Hand.MAIN_HAND, hit);
+			LOG.info("PROTECT-TEST placed by the player: result={} block={}", r, blockAt(client, -1, 0, 2));
+		}
+		if (n == 108 && net != null) {
+			var b = breakBase;
+			net.sendChatCommand("setblock " + b.getX() + " " + b.getY() + " " + (b.getZ() + 2) + " minecraft:dirt");
+			net.sendChatCommand("setblock " + (b.getX() + 1) + " " + b.getY() + " " + (b.getZ() + 2) + " minecraft:dirt");
+			net.sendChatCommand("grimmmc spare-placed true");
+		}
+		if (n == 114) togglePossess(client);
+		if (n == 120) LOG.info("PROTECT-TEST before phase A (spare on): {}", row(client));
+		if (n == 124) o.attackKey.setPressed(true);
+		if (n == 125) o.attackKey.setPressed(false);
+		if (n == 140) LOG.info("PROTECT-TEST after phase A (placed block spared): {}", row(client));
+		// phase B: spare off, the natural blocks back, the placed one still there
+		if (n == 150 && net != null) {
+			var b = breakBase;
+			net.sendChatCommand("grimmmc spare-placed false");
+			net.sendChatCommand("setblock " + b.getX() + " " + b.getY() + " " + (b.getZ() + 2) + " minecraft:dirt");
+			net.sendChatCommand("setblock " + (b.getX() + 1) + " " + b.getY() + " " + (b.getZ() + 2) + " minecraft:dirt");
+		}
+		if (n == 160) LOG.info("PROTECT-TEST before phase B (spare off): {}", row(client));
+		if (n == 164) o.attackKey.setPressed(true);
+		if (n == 165) o.attackKey.setPressed(false);
+		if (n == 180) LOG.info("PROTECT-TEST after phase B (everything breaks): {}", row(client));
+		// phase C: Ruby's digging off
+		if (n == 190 && net != null) {
+			var b = breakBase;
+			net.sendChatCommand("grimmmc digging ruby false");
+			net.sendChatCommand("fill " + (b.getX() - 1) + " " + b.getY() + " " + (b.getZ() + 2) + " " + (b.getX() + 1) + " " + b.getY() + " " + (b.getZ() + 2) + " minecraft:dirt");
+		}
+		if (n == 200) LOG.info("PROTECT-TEST before phase C (Ruby digging off): {}", row(client));
+		if (n == 204) o.attackKey.setPressed(true);
+		if (n == 205) o.attackKey.setPressed(false);
+		if (n == 220) LOG.info("PROTECT-TEST after phase C (nothing breaks): {}", row(client));
+		if (n == 225 && net != null) net.sendChatCommand("grimmmc status");
+		if (n == 240) client.scheduleStop();
+	}
 	/** Dirt left in each layer (z offset 2 to 7) of the wall. */
 	static String layers(MinecraftClient client) {
 		StringBuilder sb = new StringBuilder();

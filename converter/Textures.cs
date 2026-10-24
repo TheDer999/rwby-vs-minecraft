@@ -16,6 +16,47 @@ static class Textures
 
     public static bool CanDecode(int fmt) => fmt is RGB24 or RGBA32 or ARGB32 or DXT1 or DXT5;
 
+    /// <summary>Crunch-compressed DXT (the Grimm models use it).</summary>
+    public static bool IsCrunched(int fmt) => fmt is DXT1Crunched or DXT5Crunched;
+
+    /// <summary>
+    /// Unpacks a crunch file to plain DXT blocks (mip level 0). Unity 5 uses the original crunch format; the newer Unity fork is tried second.
+    /// </summary>
+    public static unsafe byte[] CrunchToDxt(byte[] data, int w, int h)
+    {
+        return Try(data, w, h, false) ?? Try(data, w, h, true);
+
+        static byte[] Try(byte[] data, int w, int h, bool unity)
+        {
+            fixed (byte* p = data)
+            {
+                int[] info = new int[9];
+                fixed (int* ip = info)
+                {
+                    info[0] = 36; // struct size
+                    bool ok = unity ? AssetRipper.Conversions.UnityCrunch.UnityCrunch.crnd_get_texture_info(p, data.Length, ip)
+                                    : AssetRipper.Conversions.Crunch.Crunch.crnd_get_texture_info(p, data.Length, ip);
+                    if (!ok || info[5] <= 0) return null;
+                }
+                int bpb = info[5], bw = (w + 3) / 4, bh = (h + 3) / 4;
+                var o = new byte[bw * bh * bpb];
+                void* ctx = unity ? AssetRipper.Conversions.UnityCrunch.UnityCrunch.crnd_unpack_begin(p, data.Length)
+                                  : AssetRipper.Conversions.Crunch.Crunch.crnd_unpack_begin(p, data.Length);
+                if (ctx == null) return null;
+                bool done;
+                fixed (byte* op = o)
+                {
+                    void** dst = stackalloc void*[1];
+                    dst[0] = op;
+                    done = unity ? AssetRipper.Conversions.UnityCrunch.UnityCrunch.crnd_unpack_level(ctx, dst, o.Length, bw * bpb, 0)
+                                 : AssetRipper.Conversions.Crunch.Crunch.crnd_unpack_level(ctx, dst, o.Length, bw * bpb, 0);
+                }
+                if (unity) AssetRipper.Conversions.UnityCrunch.UnityCrunch.crnd_unpack_end(ctx); else AssetRipper.Conversions.Crunch.Crunch.crnd_unpack_end(ctx);
+                return done ? o : null;
+            }
+        }
+    }
+
     /// <summary>Returns top-down RGBA8 (Unity stores textures bottom-up), or null when the format is not supported.</summary>
     public static byte[] Decode(byte[] d, int w, int h, int fmt)
     {
@@ -44,6 +85,12 @@ static class Textures
             case DXT1:
             case DXT5:
                 DecodeDxt(d, w, h, fmt == DXT5, o);
+                return o;
+            case DXT1Crunched:
+            case DXT5Crunched:
+                var dxt = CrunchToDxt(d, w, h);
+                if (dxt == null) return null;
+                DecodeDxt(dxt, w, h, fmt == DXT5Crunched, o);
                 return o;
         }
         return null;

@@ -9,5 +9,11 @@
 	"key.grimmmc.dash": "Dash attack",
 	"key.grimmmc.prev": "Previous clip",
 	"key.grimmmc.next": "Next clip",
+	"entity.grimmmc.beowolf_small": "Small Beowolf",
+	"entity.grimmmc.beowolf_medium": "Medium Beowolf",
+	"entity.grimmmc.beowolf_large": "Large Beowolf",
+	"entity.grimmmc.creep_small": "Small Creep",
+	"entity.grimmmc.creep_medium": "Medium Creep",
+	"entity.grimmmc.creep_large": "Large Creep",
 	"category.grimmmc": "Grimm Eclipse in Minecraft"
 }

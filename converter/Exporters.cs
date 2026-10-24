@@ -6,7 +6,7 @@ using AssetsTools.NET.Extra;
 namespace GrimmConvert;
 
 /// <summary>What to extract for one playable character. Names, not asset ids, so another build still resolves.</summary>
-sealed record CharacterSpec(string Id, string BodyMesh, string SkeletonRoot, string[] PropMeshes, string ScriptClass);
+sealed record CharacterSpec(string Id, string BodyMesh, string SkeletonRoot, string[] PropMeshes, string ScriptClass, string TextureContains = null);
 
 /// <summary>Everything read from one Unity Mesh object.</summary>
 sealed class MeshData
@@ -85,7 +85,7 @@ static class Exporters
         var bf = ua.Base(inst, info);
         string name = UnityAssets.NameOf(inst, info);
         int w = bf["m_Width"].AsInt, h = bf["m_Height"].AsInt, fmt = bf["m_TextureFormat"].AsInt;
-        if (!Textures.CanDecode(fmt))
+        if (!Textures.CanDecode(fmt) && !Textures.IsCrunched(fmt))
             throw new ConvertException(ExitCodes.UnsupportedTexture,
                 $"Texture '{name}' is stored as {Textures.FormatName(fmt)}, which this converter cannot read yet.");
         byte[] data;
@@ -94,7 +94,8 @@ static class Exporters
             data = ua.ReadStream(sd["path"].AsString, sd["offset"].AsUInt, sd["size"].AsUInt);
         else
             data = bf["image data"]["Array"].AsByteArray;
-        var rgba = Textures.Decode(data, w, h, fmt);
+        var rgba = Textures.Decode(data, w, h, fmt)
+            ?? throw new ConvertException(ExitCodes.UnsupportedTexture, $"Texture '{name}' ({Textures.FormatName(fmt)}) could not be unpacked.");
         Textures.WritePng(outPng, rgba, w, h);
         return new TextureResult(name, w, h, fmt, Path.GetFileName(outPng));
     }
@@ -119,7 +120,8 @@ static class Exporters
     // ---- rig (skinned mesh + skeleton + clips)
 
     public sealed record RigResult(int Vertices, int Bones, int Nodes, int Clips, string BodyTextureName,
-        (AssetsFileInstance inst, AssetFileInfo info) BodyTexture);
+        (AssetsFileInstance inst, AssetFileInfo info) BodyTexture,
+        List<(AssetsFileInstance inst, AssetFileInfo info)?> MaterialTextures);
 
     public static RigResult ExportRig(UnityAssets ua, CharacterSpec spec, string outFile, Action<string> log)
     {
@@ -136,6 +138,16 @@ static class Exporters
                 var me = ua.Resolve(inst, bf["m_Mesh"]);
                 if (me.info == null || me.info.TypeId != UnityAssets.Mesh) continue;
                 if (UnityAssets.NameOf(me.file, me.info) != spec.BodyMesh) continue;
+                if (spec.TextureContains != null)
+                {
+                    // One mesh can be shared by variants (a mutant Creep reuses the Creep mesh): take the renderer with the wanted texture.
+                    bool wanted = bf["m_Materials"]["Array"].Children.Any(m =>
+                    {
+                        var tex = MainTexture(ua, inst, m);
+                        return tex != null && UnityAssets.NameOf(tex.Value.inst, tex.Value.info).Contains(spec.TextureContains, StringComparison.OrdinalIgnoreCase);
+                    });
+                    if (!wanted) continue;
+                }
                 smrInst = inst; smrInfo = info; meshExt = me;
                 break;
             }
@@ -171,7 +183,7 @@ static class Exporters
             throw new ConvertException(ExitCodes.AssetMissing, $"Could not find the texture of '{spec.BodyMesh}'.");
 
         // 5. Animation clips that animate this character's skeleton root, Idle first.
-        var clipRefs = FindClips(ua, spec.SkeletonRoot);
+        var clipRefs = FindClips(ua, spec.SkeletonRoot, boneNames);
         if (clipRefs.Count == 0)
             throw new ConvertException(ExitCodes.AssetMissing, $"Could not find any animations for '{spec.SkeletonRoot}'.");
         log($"Found {clipRefs.Count} animation clips");
@@ -250,14 +262,15 @@ static class Exporters
         })) + "\n]}");
         File.WriteAllText(outFile, sb.ToString());
 
-        return new RigResult(mesh.VertexCount, bind.Length, nodes.Count, clipData.Count, UnityAssets.NameOf(bodyTex.Value.inst, bodyTex.Value.info), bodyTex.Value);
+        var matTex = sbf["m_Materials"]["Array"].Children.Select(m => MainTexture(ua, smrInst, m)).ToList();
+        return new RigResult(mesh.VertexCount, bind.Length, nodes.Count, clipData.Count, UnityAssets.NameOf(bodyTex.Value.inst, bodyTex.Value.info), bodyTex.Value, matTex);
     }
 
     /// <summary>
     /// Every AnimationClip that animates the skeleton root (a rotation curve whose path is exactly the root name),
     /// Idle first, the rest by asset id. A repeated clip name keeps its first copy.
     /// </summary>
-    static List<(string name, AssetsFileInstance inst, AssetFileInfo info)> FindClips(UnityAssets ua, string root)
+    static List<(string name, AssetsFileInstance inst, AssetFileInfo info)> FindClips(UnityAssets ua, string root, List<string> meshBones)
     {
         var found = new List<(string name, AssetsFileInstance inst, AssetFileInfo info)>();
         foreach (var path in ua.FilePaths())
@@ -266,7 +279,11 @@ static class Exporters
             foreach (var info in inst.file.AssetInfos.Where(i => i.TypeId == UnityAssets.AnimationClip))
             {
                 var bf = ua.Base(inst, info);
-                if (!bf["m_RotationCurves"]["Array"].Children.Any(c => c["path"].AsString == root)) continue;
+                var curves = bf["m_RotationCurves"]["Array"].Children;
+                if (!curves.Any(c => c["path"].AsString == root)) continue;
+                // Several characters can share one skeleton root name (Bip01): keep the clips that animate this model's own bones.
+                var leafSet = new HashSet<string>(meshBones);
+                if (curves.Count(c => leafSet.Contains(c["path"].AsString.Replace("\\", "/").Split('/').Last())) < meshBones.Count / 2) continue;
                 found.Add((UnityAssets.NameOf(inst, info), inst, info));
             }
             if (found.Count > 0) break; // clips of one character live in one file

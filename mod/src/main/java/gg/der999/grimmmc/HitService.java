@@ -101,7 +101,7 @@ final class HitService {
 	}
 
 	/** Breaking a bulk block (sand, gravel, wood, leaves, glass) also takes up to 8 connected blocks of the same kind within 2 blocks of it. */
-	private static void cascade(MinecraftClient client, net.minecraft.util.math.BlockPos origin, net.minecraft.block.BlockState state, List<net.minecraft.util.math.BlockPos> found) {
+	static void cascade(World world, net.minecraft.util.math.BlockPos origin, net.minecraft.block.BlockState state, List<net.minecraft.util.math.BlockPos> found) {
 		int kind = bulkKind(state);
 		if (kind == 0) return;
 		java.util.ArrayDeque<net.minecraft.util.math.BlockPos> queue = new java.util.ArrayDeque<>();
@@ -113,7 +113,7 @@ final class HitService {
 				net.minecraft.util.math.BlockPos next = at.offset(d);
 				if (extra >= 8 || found.size() >= 60) return;
 				if (Math.abs(next.getX() - origin.getX()) > 2 || Math.abs(next.getY() - origin.getY()) > 2 || Math.abs(next.getZ() - origin.getZ()) > 2) continue;
-				if (found.contains(next) || bulkKind(client.world.getBlockState(next)) != kind) continue;
+				if (found.contains(next) || bulkKind(world.getBlockState(next)) != kind || Protection.spared(Protection.dimension(world), next)) continue;
 				found.add(next.toImmutable());
 				queue.add(next);
 				extra++;
@@ -141,13 +141,13 @@ final class HitService {
 				if (u * u + v * v > radius * radius) continue;
 				Vec3d start = center.subtract(fwd.multiply(radius)).add(right.multiply(u)).add(0, v, 0);
 				// the swing must touch the dirt inside its sphere; from there the ray goes on until it has `depth` blocks
-				drill(client, start, fwd, radius * 2, radius * 2 + depth + 1, depth, floorY, found);
+				drill(client.world, start, fwd, radius * 2, radius * 2 + depth + 1, depth, floorY, found);
 			}
 		}
 	}
 
 	/** Walks a line and adds up to `depth` breakable blocks along it; it ends at the first solid block that cannot be broken. */
-	private static void drill(MinecraftClient client, Vec3d start, Vec3d dir, double contactReach, double length, int depth, int minY, List<net.minecraft.util.math.BlockPos> found) {
+	static void drill(World world, Vec3d start, Vec3d dir, double contactReach, double length, int depth, int minY, List<net.minecraft.util.math.BlockPos> found) {
 		int used = 0;
 		net.minecraft.util.math.BlockPos last = null;
 		for (double t = 0; t <= length && used < depth && found.size() < 60; t += 0.25) {
@@ -157,16 +157,17 @@ final class HitService {
 			if (pos.equals(last)) continue;
 			last = pos;
 			if (pos.getY() < minY) continue;
-			net.minecraft.block.BlockState state = client.world.getBlockState(pos);
-			int c = cost(client.world, pos, state);
+			net.minecraft.block.BlockState state = world.getBlockState(pos);
+			int c = cost(world, pos, state);
 			if (c > 0) {
+				if (Protection.spared(Protection.dimension(world), pos)) break; // a block a player placed, spared by option
 				if (c > depth - used) break; // too hard for what is left of this attack's depth
 				used += c;
 				if (!found.contains(pos)) {
 					found.add(pos.toImmutable());
-					cascade(client, pos, state, found);
+					cascade(world, pos, state, found);
 				}
-			} else if (!state.getCollisionShape(client.world, pos).isEmpty()) {
+			} else if (!state.getCollisionShape(world, pos).isEmpty()) {
 				break;
 			}
 		}
@@ -181,14 +182,14 @@ final class HitService {
 			if (pos.getSquaredDistance(center.x - 0.5, center.y - 0.5, center.z - 0.5) > radius * radius) continue;
 			// the crosshair burst takes whatever costs up to 3 (not the very hardest)
 			int c = cost(client.world, pos, client.world.getBlockState(pos));
-			if (c > 0 && c <= 3 && !found.contains(pos)) found.add(pos.toImmutable());
+			if (c > 0 && c <= 3 && !found.contains(pos) && !Protection.spared(Protection.dimension(client.world), pos)) found.add(pos.toImmutable());
 		}
 	}
 
 	/** Breaks the dirt along an attack's swing, `depth` blocks deep. */
 	static void breakInSphere(MinecraftClient client, CombatController combat, CombatData.Attack atk, int depth) {
 		PlayerEntity p = client.player;
-		if (!GrimmMcClient.CONFIG.breakBlocks || p == null || client.world == null) return;
+		if (!Protection.rubyDigs() || p == null || client.world == null) return;
 		List<net.minecraft.util.math.BlockPos> found = new ArrayList<>();
 		collectSphere(client, combat, atk, depth, found);
 		if (GrimmMcClient.AUTO) GrimmMcClient.LOG.info("break depth {} found {} at yaw {} pos {}", depth, found.size(), combat.facingYaw(), p.getBlockPos());
@@ -201,7 +202,7 @@ final class HitService {
 	 */
 	static void breakHeavy(MinecraftClient client, CombatController combat, CombatData.Attack atk) {
 		PlayerEntity p = client.player;
-		if (!GrimmMcClient.CONFIG.breakBlocks || p == null || client.world == null) return;
+		if (!Protection.rubyDigs() || p == null || client.world == null) return;
 		List<net.minecraft.util.math.BlockPos> found = new ArrayList<>();
 		collectSphere(client, combat, atk, 6, found);
 		Camera camera = client.gameRenderer.getCamera();
@@ -230,18 +231,29 @@ final class HitService {
 			ServerWorld world = server.getWorld(dim);
 			ServerPlayerEntity player = server.getPlayerManager().getPlayer(playerId);
 			if (world == null || player == null) return;
-			for (net.minecraft.util.math.BlockPos pos : positions) {
-				net.minecraft.block.BlockState state = world.getBlockState(pos);
-				if (cost(world, pos, state) == 0 || !world.canPlayerModifyAt(player, pos)) continue;
-				// Whatever the block normally drops; blocks that drop nothing by themselves (glass, leaves...) drop themselves.
-				List<net.minecraft.item.ItemStack> drops = net.minecraft.block.Block.getDroppedStacks(state, world, pos, world.getBlockEntity(pos), player, net.minecraft.item.ItemStack.EMPTY);
-				if (drops.isEmpty() && state.getBlock().asItem() != net.minecraft.item.Items.AIR) drops = List.of(new net.minecraft.item.ItemStack(state.getBlock()));
-				world.breakBlock(pos, false, player);
-				for (net.minecraft.item.ItemStack stack : drops) net.minecraft.block.Block.dropStack(world, pos, stack);
-			}
+			breakNow(world, player, positions);
 		});
 	}
 
+	/**
+	 * Breaks the given blocks on the server thread: what each drops, or itself when that is nothing; skips what cannot be broken or is
+	 * spared. `breaker` is Ruby's player or the Grimm that smashed them; a player is also checked for permission to change the spot.
+	 */
+	static int breakNow(ServerWorld world, Entity breaker, List<net.minecraft.util.math.BlockPos> positions) {
+		int broken = 0;
+		for (net.minecraft.util.math.BlockPos pos : positions) {
+			net.minecraft.block.BlockState state = world.getBlockState(pos);
+			if (cost(world, pos, state) == 0 || Protection.spared(Protection.dimension(world), pos)) continue;
+			if (breaker instanceof PlayerEntity pl && !world.canPlayerModifyAt(pl, pos)) continue;
+			List<net.minecraft.item.ItemStack> drops = net.minecraft.block.Block.getDroppedStacks(state, world, pos, world.getBlockEntity(pos), breaker, net.minecraft.item.ItemStack.EMPTY);
+			if (drops.isEmpty() && state.getBlock().asItem() != net.minecraft.item.Items.AIR) drops = List.of(new net.minecraft.item.ItemStack(state.getBlock()));
+			world.breakBlock(pos, false, breaker);
+			Protection.forget(world, pos);
+			for (net.minecraft.item.ItemStack stack : drops) net.minecraft.block.Block.dropStack(world, pos, stack);
+			broken++;
+		}
+		return broken;
+	}
 	/** A ranged hit: a hitscan along the aim line (target centre, or where Ruby looks), stopped by blocks. */
 	static void shoot(MinecraftClient client, CombatController combat, CombatData.Hit h, Entity aim, int breakDepth) {
 		PlayerEntity p = client.player;
@@ -277,10 +289,10 @@ final class HitService {
 			client.world.addParticle(ParticleTypes.CRIT, at.x, at.y, at.z, 0, 0, 0);
 		}
 		// A shot digs into dirt along its line like a light attack: one block deep for the first shot, two, then three.
-		if (breakDepth > 0 && GrimmMcClient.CONFIG.breakBlocks) {
+		if (breakDepth > 0 && Protection.rubyDigs()) {
 			List<net.minecraft.util.math.BlockPos> dug = new ArrayList<>();
 			double shotLength = Math.min(80.0, best != null ? len : len + breakDepth + 0.5);
-			drill(client, eye, dir, shotLength, shotLength, breakDepth, Integer.MIN_VALUE / 2, dug);
+			drill(client.world, eye, dir, shotLength, shotLength, breakDepth, Integer.MIN_VALUE / 2, dug);
 			int floorY = MathHelper.floor(p.getY() + 0.01);
 			// spare the ground right under Ruby
 			dug.removeIf(pos -> pos.getY() < floorY && Math.hypot(pos.getX() + 0.5 - p.getX(), pos.getZ() + 0.5 - p.getZ()) < 2.0);
