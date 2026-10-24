@@ -86,7 +86,7 @@ public class GrimmEntity extends HostileEntity {
 		super.onTrackedDataSet(data);
 		// The client hears the Grimm snarl as an attack begins.
 		if (data == ATTACK_START && getWorld().isClient() && dataTracker.get(ATTACK_START) >= 0) {
-			Sounds.grimmVoice(kind == GrimmKind.BEOWOLF ? "bark_" : "creep_grunt_", getPos(), size);
+			Sounds.grimmVoice(kind.voice(), getPos(), size);
 		}
 	}
 
@@ -111,7 +111,7 @@ public class GrimmEntity extends HostileEntity {
 	@Override
 	protected void updatePostDeath() {
 		deathTime++;
-		if (deathTime >= 45 && !getWorld().isClient() && !isRemoved()) {
+		if (deathTime >= (int) (kind.deathSeconds() * 20f) + 8 && !getWorld().isClient() && !isRemoved()) {
 			getWorld().sendEntityStatus(this, (byte) 60);
 			remove(RemovalReason.KILLED);
 		}

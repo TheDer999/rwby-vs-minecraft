@@ -15,5 +15,14 @@
 	"entity.grimmmc.creep_small": "Small Creep",
 	"entity.grimmmc.creep_medium": "Medium Creep",
 	"entity.grimmmc.creep_large": "Large Creep",
+	"entity.grimmmc.ursa_small": "Small Ursa",
+	"entity.grimmmc.ursa_medium": "Medium Ursa",
+	"entity.grimmmc.ursa_large": "Large Ursa",
+	"entity.grimmmc.boar_small": "Small Boarbatusk",
+	"entity.grimmmc.boar_medium": "Medium Boarbatusk",
+	"entity.grimmmc.boar_large": "Large Boarbatusk",
+	"entity.grimmmc.deathstalker_small": "Small Deathstalker",
+	"entity.grimmmc.deathstalker_medium": "Medium Deathstalker",
+	"entity.grimmmc.deathstalker_large": "Large Deathstalker",
 	"category.grimmmc": "Grimm Eclipse in Minecraft"
 }

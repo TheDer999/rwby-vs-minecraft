@@ -24,7 +24,7 @@ public class GrimmMcMain implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
-		final int[] weights = {25, 14, 6};
+		final int[] weights = {10, 6, 3};
 		final int[] groupMax = {3, 2, 1};
 		for (GrimmKind kind : GrimmKind.values()) {
 			for (int size = 0; size < 3; size++) {

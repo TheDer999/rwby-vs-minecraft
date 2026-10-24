@@ -6,7 +6,7 @@ using AssetsTools.NET.Extra;
 namespace GrimmConvert;
 
 /// <summary>What to extract for one playable character. Names, not asset ids, so another build still resolves.</summary>
-sealed record CharacterSpec(string Id, string BodyMesh, string SkeletonRoot, string[] PropMeshes, string ScriptClass, string TextureContains = null);
+sealed record CharacterSpec(string Id, string BodyMesh, string SkeletonRoot, string[] PropMeshes, string ScriptClass, string TextureContains = null, string TextureExcludes = null);
 
 /// <summary>Everything read from one Unity Mesh object.</summary>
 sealed class MeshData
@@ -147,6 +147,11 @@ static class Exporters
                         return tex != null && UnityAssets.NameOf(tex.Value.inst, tex.Value.info).Contains(spec.TextureContains, StringComparison.OrdinalIgnoreCase);
                     });
                     if (!wanted) continue;
+                    if (spec.TextureExcludes != null && bf["m_Materials"]["Array"].Children.Any(m =>
+                    {
+                        var tex = MainTexture(ua, inst, m);
+                        return tex != null && UnityAssets.NameOf(tex.Value.inst, tex.Value.info).Contains(spec.TextureExcludes, StringComparison.OrdinalIgnoreCase);
+                    })) continue;
                 }
                 smrInst = inst; smrInfo = info; meshExt = me;
                 break;

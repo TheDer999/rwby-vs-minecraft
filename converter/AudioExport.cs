@@ -21,7 +21,7 @@ static class AudioExport
         // Grimm Eclipse's shared aura sounds: refilling, soaking a hit, breaking.
         || name is "Aura Recharge" or "Guard 01" or "Block Break"
         // The Grimm's voices: Beowolf barks and roars, Creep grunts and roars.
-        || name is "Bark 01" or "Bark 02" or "Roar 01" or "Creep Grunt 01" or "Creep Grunt 02" or "Creep Roar 02";
+        || name is "Bark 01" or "Bark 02" or "Roar 01" or "Creep Grunt 01" or "Creep Grunt 02" or "Creep Roar 02" or "Deathstalker Laugh" or "Boar Spin";
 
     public static string FileName(string clipName) => "sound_" + clipName.Replace(' ', '_').Replace("-", "") .Replace("__", "_") + ".wav";
 

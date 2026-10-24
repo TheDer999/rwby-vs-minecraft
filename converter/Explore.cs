@@ -130,4 +130,37 @@ static class Explore
         }
         return 0;
     }
+
+    /// <summary>Developer aid: the skinned meshes whose materials use a texture with this name, with their bone counts.</summary>
+    public static int SmrByTexture(string dataDir, string texHint)
+    {
+        var classData = Path.Combine(AppContext.BaseDirectory, "classdata.tpk");
+        var ua = new UnityAssets(dataDir, classData, "sharedassets0.assets");
+        var seen = new HashSet<string>();
+        foreach (var path in ua.FilePaths())
+        {
+            var inst = ua.Open(path);
+            foreach (var info in inst.file.AssetInfos.Where(i => i.TypeId == UnityAssets.SkinnedMeshRenderer))
+            {
+                var bf = ua.Base(inst, info);
+                var me = ua.Resolve(inst, bf["m_Mesh"]);
+                if (me.info == null || me.info.TypeId != UnityAssets.Mesh) continue;
+                bool hit = false;
+                foreach (var m in bf["m_Materials"]["Array"].Children)
+                {
+                    var mat = ua.Resolve(inst, m);
+                    if (mat.info == null) continue;
+                    foreach (var te in ua.Base(mat.file, mat.info)["m_SavedProperties"]["m_TexEnvs"]["Array"].Children)
+                    {
+                        var tx = ua.Resolve(mat.file, te["second"]["m_Texture"]);
+                        if (tx.info != null && tx.info.TypeId == UnityAssets.Texture2D && UnityAssets.NameOf(tx.file, tx.info).Contains(texHint, StringComparison.OrdinalIgnoreCase)) hit = true;
+                    }
+                }
+                if (!hit) continue;
+                var line = $"{Path.GetFileName(path)} mesh '{UnityAssets.NameOf(me.file, me.info)}' bones {bf["m_Bones"]["Array"].Children.Count} materials {bf["m_Materials"]["Array"].Children.Count}";
+                if (seen.Add(line)) Console.WriteLine(line);
+            }
+        }
+        return 0;
+    }
 }

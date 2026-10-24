@@ -16,7 +16,43 @@ enum GrimmKind {
 		new String[] {"Flip"}, new float[] {0.77f}, new float[] {0.40f},
 		new float[] {0.45f, 0.7f, 1.1f}, new float[] {0.45f, 0.65f, 1.0f},
 		new double[] {20, 45, 100}, new double[] {2, 3.5, 6}, new double[] {0.34, 0.33, 0.32}, new int[] {1, 2, 4},
-		new float[] {0.7f, 1.0f, 1.55f});
+		new float[] {0.7f, 1.0f, 1.55f}),
+	URSA("ursa", "Idle", "Run", "Run",
+		new String[] {"Smash"}, new float[] {1.83f}, new float[] {0.9f},
+		new float[] {1.3f, 1.9f, 2.6f}, new float[] {2.1f, 3.2f, 4.6f},
+		new double[] {40, 90, 200}, new double[] {3.5, 6, 10}, new double[] {0.24, 0.25, 0.26}, new int[] {2, 3, 4},
+		new float[] {0.45f, 0.7f, 1.0f}),
+	BOARBATUSK("boar", "Idle", "Walk", "Run",
+		new String[] {"Tackle", "SpinHit"}, new float[] {0.58f, 0.65f}, new float[] {0.3f, 0.3f},
+		new float[] {1.0f, 1.6f, 2.4f}, new float[] {1.3f, 2.0f, 3.2f},
+		new double[] {24, 55, 120}, new double[] {2.5, 4.5, 8}, new double[] {0.36, 0.35, 0.34}, new int[] {1, 2, 3},
+		new float[] {1.0f, 1.6f, 2.6f}),
+	DEATHSTALKER("deathstalker", "Idle", "Walk", "Run",
+		new String[] {"Swipe", "Smash"}, new float[] {1.83f, 1.17f}, new float[] {0.9f, 0.6f},
+		new float[] {1.2f, 1.8f, 2.6f}, new float[] {1.1f, 1.7f, 2.6f},
+		new double[] {30, 70, 160}, new double[] {3, 5.5, 9}, new double[] {0.30, 0.30, 0.30}, new int[] {2, 3, 4},
+		new float[] {0.18f, 0.28f, 0.45f});
+
+	/** Seconds the Death animation takes, so the body is removed when it has played. */
+	float deathSeconds() {
+		return switch (this) {
+			case URSA -> 1.9f;
+			case BOARBATUSK -> 1.5f;
+			case DEATHSTALKER -> 3.33f;
+			default -> 2.33f;
+		};
+	}
+
+	/** Prefix of the converted sound this Grimm snarls with when it attacks. */
+	String voice() {
+		return switch (this) {
+			case BEOWOLF -> "bark_";
+			case CREEP -> "creep_grunt_";
+			case URSA -> "roar_";
+			case BOARBATUSK -> "boar_spin";
+			case DEATHSTALKER -> "deathstalker_laugh";
+		};
+	}
 
 	static final String[] SIZE_NAMES = {"small", "medium", "large"};
 

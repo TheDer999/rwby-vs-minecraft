@@ -14,7 +14,7 @@ namespace GrimmConvert;
 /// </summary>
 static class Program
 {
-    const string ConverterVersion = "0.4.1";
+    const string ConverterVersion = "0.5.0";
     const string DataFolderPattern = "*_Data";
     const int ExitNotReady = 10;
 
@@ -29,6 +29,9 @@ static class Program
         // The Grimm the mod spawns: model, skeleton and animations only (their behaviour is the mod's own).
         ["beowolf"] = new CharacterSpec("beowolf", "Beowolf_Mesh", "Bip01", Array.Empty<string>(), "Beowolf"),
         ["creep"] = new CharacterSpec("creep", "Creep Mesh", "Creep Root", Array.Empty<string>(), "Creep", "Creep Body"),
+        ["ursa"] = new CharacterSpec("ursa", "Ursa", "Ursa Pelvis", Array.Empty<string>(), "Ursa", "Ursa Body", "Creep Armor"),
+        ["boar"] = new CharacterSpec("boar", "Boar_Mesh", "Boar_Pelvis", Array.Empty<string>(), "Boar", "Boar Body D"),
+        ["deathstalker"] = new CharacterSpec("deathstalker", "Death_Mesh", "Death_Root", Array.Empty<string>(), "Death", "Deathstalker Body"),
     };
 
     static int Main(string[] args)
@@ -54,7 +57,7 @@ static class Program
 
     static int Run(string[] args)
     {
-        string ge = null, outDir = null, character = "ruby", list = null, bonesOf = null, smrOf = null;
+        string ge = null, outDir = null, character = "ruby", list = null, bonesOf = null, smrOf = null, smrTex = null;
         bool force = false, check = false;
         for (int i = 0; i < args.Length; i++)
         {
@@ -63,6 +66,7 @@ static class Program
                 case "--list": list = Next(args, ref i); break;
                 case "--bones": bonesOf = Next(args, ref i); break;
                 case "--smr": smrOf = Next(args, ref i); break;
+                case "--smrtex": smrTex = Next(args, ref i); break;
                 case "--ge": ge = Next(args, ref i); break;
                 case "--out": outDir = Next(args, ref i); break;
                 case "--character": character = Next(args, ref i).ToLowerInvariant(); break;
@@ -74,6 +78,7 @@ static class Program
         if (list != null && ge != null) return Explore.List(FindDataDir(ge), list);
         if (bonesOf != null && ge != null) return Explore.Bones(FindDataDir(ge), bonesOf);
         if (smrOf != null && ge != null) return Explore.Smr(FindDataDir(ge), smrOf);
+        if (smrTex != null && ge != null) return Explore.SmrByTexture(FindDataDir(ge), smrTex);
         if (ge == null || outDir == null)
             throw new ConvertException(ExitCodes.Usage, "Usage: GrimmConvert --ge <Grimm Eclipse folder> --out <output folder> [--force] [--check] [--character ruby]");
         if (!Characters.TryGetValue(character, out var spec))
@@ -123,9 +128,9 @@ static class Program
             Progress(7, total, $"Reading {displayName}'s sounds and voice lines");
             var audio = AudioExport.Export(ua, tmp, Info);
 
-            Progress(8, total, "Reading the Grimm: Beowolf and Creep");
+            Progress(8, total, "Reading the Grimm");
             var grimmOut = new List<object>();
-            foreach (var gid in new[] { "beowolf", "creep" })
+            foreach (var gid in new[] { "beowolf", "creep", "ursa", "boar", "deathstalker" })
             {
                 try
                 {
@@ -134,7 +139,8 @@ static class Program
                     {
                         var mt = gr.MaterialTextures[mi];
                         if (mt == null) continue;
-                        Exporters.ExportTexture(ua, mt.Value.inst, mt.Value.info, Path.Combine(tmp, $"{gid}_texture{mi}.png"));
+                        try { Exporters.ExportTexture(ua, mt.Value.inst, mt.Value.info, Path.Combine(tmp, $"{gid}_texture{mi}.png")); }
+                        catch (ConvertException e) when (mi > 0) { Info($"{gid} texture {mi} skipped: {e.Message}"); }
                     }
                     grimmOut.Add(new { id = gid, vertices = gr.Vertices, clips = gr.Clips, textures = gr.MaterialTextures.Count });
                 }

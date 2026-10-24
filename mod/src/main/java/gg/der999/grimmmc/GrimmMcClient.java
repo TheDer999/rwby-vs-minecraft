@@ -691,10 +691,10 @@ public class GrimmMcClient implements ClientModInitializer {
 		if (n == 92 && net != null) net.sendChatCommand("gamemode creative");
 		if (n == 94 && net != null) net.sendChatCommand("time set noon");
 		if (n == 96 && net != null) {
-			String[] kinds = {"beowolf_small", "beowolf_medium", "beowolf_large"};
+			String[] kinds = {"ursa_small", "boar_small", "deathstalker_small"};
 			double[] bx = {-5, -0.5, 4.5};
 			for (int i = 0; i < 3; i++) net.sendChatCommand("summon grimmmc:" + kinds[i] + " ~" + bx[i] + " ~ ~10 {NoAI:1b,Rotation:[180f,0f]}");
-			String[] creeps = {"creep_small", "creep_medium", "creep_large"};
+			String[] creeps = {"ursa_large", "boar_large", "deathstalker_large"};
 			double[] cx = {-3.5, 0, 3.5};
 			for (int i = 0; i < 3; i++) net.sendChatCommand("summon grimmmc:" + creeps[i] + " ~" + cx[i] + " ~ ~5 {NoAI:1b,Rotation:[180f,0f]}");
 		}
@@ -751,9 +751,9 @@ public class GrimmMcClient implements ClientModInitializer {
 		if (n == 94 && net != null) net.sendChatCommand("effect give @s minecraft:resistance 600 4 true");
 		if (n == 95 && net != null) net.sendChatCommand("time set noon");
 		if (n == 96 && net != null) {
-			net.sendChatCommand("summon grimmmc:beowolf_medium ~-3 ~ ~7");
-			net.sendChatCommand("summon grimmmc:beowolf_large ~4 ~ ~9");
-			net.sendChatCommand("summon grimmmc:creep_medium ~ ~ ~6");
+			net.sendChatCommand("summon grimmmc:ursa_medium ~-4 ~ ~8");
+			net.sendChatCommand("summon grimmmc:boar_medium ~4 ~ ~8");
+			net.sendChatCommand("summon grimmmc:deathstalker_medium ~ ~ ~10");
 		}
 		if (n >= 100 && n < 400) { p.setYaw(0f); p.setPitch(10f); }
 		for (int t : new int[] {135, 160, 185, 210, 235, 260}) if (n == t) shoot(client);
