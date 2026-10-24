@@ -48,12 +48,14 @@ final class GrimmConfig {
 	final boolean grimmBreakBlocks;
 	/** Whether Grimm spawn by themselves in the overworld (config key grimm_spawn, default true). /summon always works. */
 	final boolean grimmSpawn;
+	/** Scales how many Grimm are kept around each player (config key grimm_spawn_multiplier, default 1: up to 5 by day and 14 at night). */
+	final float grimmSpawnMultiplier;
 	/** Whether blocks players placed are spared by Ruby and the Grimm (config key spare_placed, default false). */
 	final boolean sparePlaced;
 	/** Enables the developer keys (animation browser, placed Ruby) (config key debug=true). */
 	final boolean debug;
 
-	private GrimmConfig(Path home, Path dataDir, String geDir, Path converter, float damageScale, float knockbackScale, boolean hitAllMobs, float auraMax, float auraRechargeSeconds, boolean geSounds, float soundVolume, float jumpHeight, boolean breakBlocks, boolean grimmBreakBlocks, boolean grimmSpawn, boolean sparePlaced, boolean debug) {
+	private GrimmConfig(Path home, Path dataDir, String geDir, Path converter, float damageScale, float knockbackScale, boolean hitAllMobs, float auraMax, float auraRechargeSeconds, boolean geSounds, float soundVolume, float jumpHeight, boolean breakBlocks, boolean grimmBreakBlocks, boolean grimmSpawn, float grimmSpawnMultiplier, boolean sparePlaced, boolean debug) {
 		this.home = home;
 		this.dataDir = dataDir;
 		this.geDir = geDir;
@@ -69,6 +71,7 @@ final class GrimmConfig {
 		this.breakBlocks = breakBlocks;
 		this.grimmBreakBlocks = grimmBreakBlocks;
 		this.grimmSpawn = grimmSpawn;
+		this.grimmSpawnMultiplier = grimmSpawnMultiplier;
 		this.sparePlaced = sparePlaced;
 		this.debug = debug;
 	}
@@ -120,6 +123,7 @@ final class GrimmConfig {
 			!"false".equalsIgnoreCase(p.getProperty("break_blocks", "true").trim()),
 			!"false".equalsIgnoreCase(p.getProperty("grimm_break_blocks", "true").trim()),
 			!"false".equalsIgnoreCase(p.getProperty("grimm_spawn", "true").trim()),
+			Math.max(0f, Math.min(5f, number(p, "grimm_spawn_multiplier", 1f))),
 			"true".equalsIgnoreCase(p.getProperty("spare_placed", "false").trim()),
 			"true".equalsIgnoreCase(p.getProperty("debug", "false").trim()));
 	}

@@ -121,7 +121,7 @@ public class GrimmEntity extends HostileEntity {
 
 	/** Reach in blocks from the edge of its body. */
 	double reach() {
-		return 1.1 + 0.35 * size;
+		return 1.3 + 0.5 * size;
 	}
 
 	boolean inReach(LivingEntity target) {
@@ -179,9 +179,9 @@ public class GrimmEntity extends HostileEntity {
 		long time = world.toServerWorld().getTimeOfDay() % 24000L;
 		boolean night = time >= 13000L && time < 23000L;
 		return switch (size) {
-			case 0 -> night ? random.nextInt(3) == 0 : random.nextInt(2) == 0; // a few small ones in the day, fewer at night
-			case 1 -> night && random.nextInt(2) == 0;
-			default -> night && random.nextInt(3) == 0;
+			case 0 -> true; // small ones by day and by night
+			case 1 -> night;
+			default -> night && random.nextInt(2) == 0;
 		};
 	}
 
@@ -250,6 +250,15 @@ public class GrimmEntity extends HostileEntity {
 			if (t == null) return;
 			g.getLookControl().lookAt(t, 40f, 40f);
 			if (cooldown > 0) cooldown--;
+			// Smash whatever is in the way as it advances (a Grimm does not walk around walls).
+			if (attackLeft <= 0 && g.age % 7 == 0 && g.getWorld() instanceof ServerWorld sw && g.getPos().squaredDistanceTo(lastPos) >= 0 && !g.inReach(t)) {
+				double dx = t.getX() - g.getX(), dz = t.getZ() - g.getZ();
+				float yaw = (float) (MathHelper.atan2(-dx, dz) * 57.29577951308232);
+				if (g.horizontalCollision || g.getNavigation().isIdle() || g.squaredDistanceTo(t) > 4) {
+					g.setBodyYaw(yaw);
+					g.dig(sw);
+				}
+			}
 			if (attackLeft > 0) {
 				attackLeft--;
 				g.getNavigation().stop();
@@ -282,7 +291,7 @@ public class GrimmEntity extends HostileEntity {
 			g.startAttack(g.getTarget());
 			attackLeft = (int) (g.kind.attackSeconds[g.attackVariant()] * 20f);
 			hitDone = false;
-			cooldown = attackLeft + 12 + g.random.nextInt(10);
+			cooldown = attackLeft + 5 + g.random.nextInt(6);
 		}
 	}
 }

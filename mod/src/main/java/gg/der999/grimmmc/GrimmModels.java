@@ -62,6 +62,7 @@ final class GrimmModels {
 				}
 			}
 			MODELS.put(kind, m);
+			if (GrimmMcClient.AUTO) logBounds(kind.id, m.rig);
 			Sounds.load(d); // the Grimm's voices (a no-op when Ruby has already loaded them)
 			GrimmMcClient.LOG.info("Loaded the {} model: {} vertices, {} clips", kind.id, m.rig.vertexCount, m.rig.clips.length);
 			return m;
@@ -70,6 +71,17 @@ final class GrimmModels {
 			GrimmMcClient.LOG.error("Could not load the {} model", kind.id, e);
 			return null;
 		}
+	}
+
+	/** Developer aid: the posed size of a model in Unity units (before the mod's scale), x width, y height, z length. */
+	static void logBounds(String name, Rig rig) {
+		int ci = rig.findClip("Idle");
+		if (ci < 0) return;
+		float[] out = new float[rig.vertexCount * 3];
+		rig.skin(rig.clips[ci], 0.3f, out);
+		float[] mn = {1e9f, 1e9f, 1e9f}, mx = {-1e9f, -1e9f, -1e9f};
+		for (int i = 0; i < out.length; i++) { int a = i % 3; mn[a] = Math.min(mn[a], out[i]); mx[a] = Math.max(mx[a], out[i]); }
+		GrimmMcClient.LOG.info("MODEL-SIZE {}: width {} height {} length {} (feet at y={})", name, String.format("%.2f", mx[0] - mn[0]), String.format("%.2f", mx[1] - mn[1]), String.format("%.2f", mx[2] - mn[2]), String.format("%.2f", mn[1]));
 	}
 
 	/** Length of a clip in seconds, or 0 when the model is not loaded or has no such clip. */

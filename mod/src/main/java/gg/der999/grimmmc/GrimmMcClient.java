@@ -698,6 +698,7 @@ public class GrimmMcClient implements ClientModInitializer {
 			double[] cx = {-3.5, 0, 3.5};
 			for (int i = 0; i < 3; i++) net.sendChatCommand("summon grimmmc:" + creeps[i] + " ~" + cx[i] + " ~ ~5 {NoAI:1b,Rotation:[180f,0f]}");
 		}
+		if (n == 125) { try { GrimmModels.logBounds("ruby", Rig.load(CONFIG.dataDir.resolve("ruby_rig.json"))); } catch (Exception e) { LOG.warn("ruby bounds failed", e); } }
 		if (n == 130) {
 			int count = 0;
 			for (net.minecraft.entity.Entity e : client.world.getEntities()) if (e instanceof GrimmEntity) count++;
@@ -764,31 +765,26 @@ public class GrimmMcClient implements ClientModInitializer {
 		if (n == 305) client.scheduleStop();
 	}
 
-	/** Grimm self test 4: how often each size may spawn by day and by night. */
+	/** Grimm self test 4: how many Grimm have appeared around a waiting player after some seconds of day and of night. */
 	static void autoGrimmSpawn(MinecraftClient client) {
 		autoTicks++;
 		int n = autoTicks;
 		var p = client.player;
 		var conn = p.networkHandler;
-		if (n == 92 && conn != null) conn.sendChatCommand("difficulty normal");
-		if (n == 94 && conn != null) conn.sendChatCommand("time set noon");
-		if (n == 120 || n == 160) {
-			boolean night = n == 160;
-			var server = client.getServer();
-			var world = server.getOverworld();
-			var pos = p.getBlockPos();
-			var rnd = net.minecraft.util.math.random.Random.create(7);
-			StringBuilder sb = new StringBuilder();
-			for (GrimmKind kind : GrimmKind.values()) for (int size = 0; size < 3; size++) {
-				var type = GrimmMcMain.TYPES.get(kind.ordinal() * 3 + size);
-				int ok = 0;
-				for (int i = 0; i < 1000; i++) if (GrimmEntity.canSpawn(type, world, net.minecraft.entity.SpawnReason.NATURAL, pos, rnd)) ok++;
-				sb.append(kind.entityName(size)).append('=').append(ok).append("/1000 ");
-			}
-			LOG.info("GRIMM-TEST spawn chances at {} (time {}): {}", night ? "night" : "noon", world.getTimeOfDay() % 24000, sb);
-		}
-		if (n == 130 && conn != null) conn.sendChatCommand("time set night");
-		if (n == 170) client.scheduleStop();
+		if (n == 92 && conn != null) conn.sendChatCommand("gamemode survival");
+		if (n == 93 && conn != null) conn.sendChatCommand("difficulty normal");
+		if (n == 94 && conn != null) conn.sendChatCommand("effect give @s minecraft:resistance 900 4 true");
+		if (n == 95 && conn != null) conn.sendChatCommand("time set 1000");
+		if (n == 96 && conn != null) conn.sendChatCommand("gamerule doDaylightCycle false");
+		if (n == 700 || n == 1700) logSpawned(client, n == 700 ? "day, after 30 s" : "night, after 50 s");
+		if (n == 710 && conn != null) conn.sendChatCommand("time set 15000");
+		if (n == 1750) client.scheduleStop();
+	}
+
+	static void logSpawned(MinecraftClient client, String label) {
+		java.util.Map<String, Integer> m = new java.util.TreeMap<>();
+		for (net.minecraft.entity.Entity e : client.world.getEntities()) if (e instanceof GrimmEntity g) m.merge(g.getType().getUntranslatedName(), 1, Integer::sum);
+		LOG.info("GRIMM-TEST spawned ({}): {}", label, m);
 	}
 	/** Row of blocks two ahead of the base position: names of the three (left, middle, right). */
 	static String row(MinecraftClient client) {
