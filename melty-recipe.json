@@ -1,11 +1,11 @@
-{
+﻿{
   "schemaVersion": 1,
   "mode": "installed",
   "games": [
     {"role": "primary", "slug": "minecraft-java"},
     {"role": "secondary", "slug": "custom-rwby-grimm-eclipse"}
   ],
-  "components": [{"id": "main", "kind": "main", "label": "Grimm Eclipse in Minecraft (Prism Launcher with the GrimmMC instance)", "fileName": "GrimmMC-0.14.2.zip", "required": true}],
+  "components": [{"id": "main", "kind": "main", "label": "Grimm Eclipse in Minecraft (Prism Launcher with the GrimmMC instance)", "fileName": "GrimmMC-0.14.3.zip", "required": true}],
   "requirements": [],
   "mappings": [{"component": "main", "from": "", "to": "{localappdata}/GrimmMC"}],
   "setup": {

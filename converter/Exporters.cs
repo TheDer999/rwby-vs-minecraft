@@ -326,6 +326,8 @@ static class Exporters
                 float len = MathF.Sqrt(rootMatrix[c] * rootMatrix[c] + rootMatrix[4 + c] * rootMatrix[4 + c] + rootMatrix[8 + c] * rootMatrix[8 + c]);
                 if (len > 1e-6f) { rootMatrix[c] /= len; rootMatrix[4 + c] /= len; rootMatrix[8 + c] /= len; }
             }
+            if (spec.Id == "mutant_creep") // its prefab turns the other way round: use the opposite quarter turn so it stands on its feet
+                (rootMatrix[1], rootMatrix[2], rootMatrix[4], rootMatrix[6], rootMatrix[8], rootMatrix[9]) = (rootMatrix[4], rootMatrix[8], rootMatrix[1], rootMatrix[9], rootMatrix[2], rootMatrix[6]);
             sb.Append("\"root\":[" + string.Join(",", rootMatrix.Select(F)) + "],\n"); }
         sb.Append("\"nodes\":[\n" + string.Join(",\n", nodes.Select(p =>
         {

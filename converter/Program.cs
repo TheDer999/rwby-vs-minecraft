@@ -14,7 +14,7 @@ namespace GrimmConvert;
 /// </summary>
 static class Program
 {
-    const string ConverterVersion = "0.6.1";
+    const string ConverterVersion = "0.6.2";
     const string DataFolderPattern = "*_Data";
     const int ExitNotReady = 10;
 
