@@ -90,6 +90,8 @@ final class Protection {
 
 	static synchronized boolean grimmDigs() { return grimm; }
 
+	static synchronized boolean sparesPlaced() { return sparePlaced; }
+
 	/** True if a block the player placed must be left alone (the option is on and this block was placed by a player). */
 	static synchronized boolean spared(String dimension, BlockPos pos) {
 		if (!sparePlaced) return false;

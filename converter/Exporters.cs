@@ -6,7 +6,7 @@ using AssetsTools.NET.Extra;
 namespace GrimmConvert;
 
 /// <summary>What to extract for one playable character. Names, not asset ids, so another build still resolves.</summary>
-sealed record CharacterSpec(string Id, string BodyMesh, string SkeletonRoot, string[] PropMeshes, string ScriptClass, string TextureContains = null, string TextureExcludes = null);
+sealed record CharacterSpec(string Id, string BodyMesh, string SkeletonRoot, string[] PropMeshes, string ScriptClass, string TextureContains = null, string TextureExcludes = null, string[] ClipFilter = null);
 
 /// <summary>Everything read from one Unity Mesh object.</summary>
 sealed class MeshData
@@ -189,6 +189,8 @@ static class Exporters
 
         // 5. Animation clips that animate this character's skeleton root, Idle first.
         var clipRefs = FindClips(ua, spec.SkeletonRoot, boneNames);
+        // A skeleton shared with many other moves (the mutant Beowolf's) keeps only the animations the mod plays.
+        if (spec.ClipFilter != null) clipRefs = clipRefs.Where(c => spec.ClipFilter.Contains(c.name)).ToList();
         if (clipRefs.Count == 0)
             throw new ConvertException(ExitCodes.AssetMissing, $"Could not find any animations for '{spec.SkeletonRoot}'.");
         log($"Found {clipRefs.Count} animation clips");
@@ -230,12 +232,12 @@ static class Exporters
         int NodeOfLeaf(string leaf)
         {
             var hits = nodes.Select((p, i) => (p, i)).Where(x => x.p.Split('/').Last() == leaf).ToList();
-            return hits.Count == 1 ? hits[0].i : -1;
+            return hits.Count >= 1 ? hits[0].i : -1; // a leaf name used twice (a duplicated bone) takes its first node
         }
 
         var meshBones = boneNames.Select(NodeOfLeaf).ToArray();
         if (meshBones.Any(i => i < 0))
-            throw new ConvertException(ExitCodes.AssetMissing, "Some bones of the model are missing from its animations.");
+            throw new ConvertException(ExitCodes.AssetMissing, "Some bones of the model are missing from its animations: " + string.Join(", ", boneNames.Where(n => NodeOfLeaf(n) < 0).Take(8)));
 
         // 6. Write the rig file.
         var sb = new StringBuilder();

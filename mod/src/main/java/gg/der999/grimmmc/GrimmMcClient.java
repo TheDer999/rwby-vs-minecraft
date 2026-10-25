@@ -691,10 +691,10 @@ public class GrimmMcClient implements ClientModInitializer {
 		if (n == 92 && net != null) net.sendChatCommand("gamemode creative");
 		if (n == 94 && net != null) net.sendChatCommand("time set noon");
 		if (n == 96 && net != null) {
-			String[] kinds = {"ursa_small", "boar_small", "deathstalker_small"};
+			String[] kinds = {"mutant_beowolf_small", "mutant_creep_small", "mutant_deathstalker_small"};
 			double[] bx = {-5, -0.5, 4.5};
 			for (int i = 0; i < 3; i++) net.sendChatCommand("summon grimmmc:" + kinds[i] + " ~" + bx[i] + " ~ ~10 {NoAI:1b,Rotation:[180f,0f]}");
-			String[] creeps = {"ursa_large", "boar_large", "deathstalker_large"};
+			String[] creeps = {"mutant_beowolf_large", "mutant_creep_large", "mutant_deathstalker_large"};
 			double[] cx = {-3.5, 0, 3.5};
 			for (int i = 0; i < 3; i++) net.sendChatCommand("summon grimmmc:" + creeps[i] + " ~" + cx[i] + " ~ ~5 {NoAI:1b,Rotation:[180f,0f]}");
 		}
@@ -719,26 +719,27 @@ public class GrimmMcClient implements ClientModInitializer {
 		var net = p.networkHandler;
 		if (n == 92 && net != null) net.sendChatCommand("gamemode survival");
 		if (n == 93 && net != null) net.sendChatCommand("difficulty normal");
-		if (n == 94 && net != null) net.sendChatCommand("effect give @s minecraft:resistance 600 4 true");
+		if (n == 94 && net != null) net.sendChatCommand("effect give @s minecraft:resistance 900 4 true");
 		if (n == 96) {
 			breakBase = p.getBlockPos();
 			var b = breakBase;
 			if (net != null) {
-				// two stone shells around the player: 2 thick, 3x3 inside
+				// a thick stone shell around the player, then a mutant Beowolf, a mutant Deathstalker and a mutant Creep
 				net.sendChatCommand("fill " + (b.getX() - 3) + " " + b.getY() + " " + (b.getZ() - 3) + " " + (b.getX() + 3) + " " + (b.getY() + 4) + " " + (b.getZ() + 3) + " minecraft:stone hollow");
 				net.sendChatCommand("fill " + (b.getX() - 2) + " " + b.getY() + " " + (b.getZ() - 2) + " " + (b.getX() + 2) + " " + (b.getY() + 3) + " " + (b.getZ() + 2) + " minecraft:stone hollow");
-				net.sendChatCommand("summon grimmmc:beowolf_medium " + b.getX() + " " + b.getY() + " " + (b.getZ() + 12));
-				net.sendChatCommand("summon grimmmc:beowolf_large " + (b.getX() + 6) + " " + b.getY() + " " + (b.getZ() + 12));
-				net.sendChatCommand("summon grimmmc:creep_small " + (b.getX() - 6) + " " + b.getY() + " " + (b.getZ() + 12));
+				net.sendChatCommand("summon grimmmc:mutant_beowolf_medium " + b.getX() + " " + b.getY() + " " + (b.getZ() + 12));
+				net.sendChatCommand("summon grimmmc:mutant_deathstalker_small " + (b.getX() + 8) + " " + b.getY() + " " + (b.getZ() + 14));
+				net.sendChatCommand("summon grimmmc:mutant_creep_medium " + (b.getX() - 8) + " " + b.getY() + " " + (b.getZ() + 10));
 			}
-		}		if (n >= 120 && n % 40 == 0 && n <= 700) {
+		}
+		if (n >= 120 && n % 40 == 0 && n <= 700) {
 			int stone = 0;
 			for (int x = -3; x <= 3; x++) for (int y = 0; y <= 4; y++) for (int z = -3; z <= 3; z++) if (blockAt(client, x, y, z).equals("stone")) stone++;
 			StringBuilder sb = new StringBuilder();
 			for (net.minecraft.entity.Entity e : client.world.getEntities()) if (e instanceof GrimmEntity g) sb.append(String.format("[%s z=%.1f x=%.1f hp=%.0f] ", g.getType().getUntranslatedName(), g.getZ() - breakBase.getZ(), g.getX() - breakBase.getX(), g.getHealth()));
 			LOG.info("GRIMM-TEST tick {}: stone left {} playerHp={} {}", n, stone, p.getHealth(), sb);
 		}
-		if (n == 700) client.scheduleStop();
+		if (n == 710) client.scheduleStop();
 	}
 	/** Grimm self test 3: Grimm that really fight, with screenshots, to see their attack animations. */
 	static void autoGrimmFight(MinecraftClient client) {

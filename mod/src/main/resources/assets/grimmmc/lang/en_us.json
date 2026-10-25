@@ -24,5 +24,14 @@
 	"entity.grimmmc.deathstalker_small": "Small Deathstalker",
 	"entity.grimmmc.deathstalker_medium": "Medium Deathstalker",
 	"entity.grimmmc.deathstalker_large": "Large Deathstalker",
+	"entity.grimmmc.mutant_beowolf_small": "Small Mutant Beowolf",
+	"entity.grimmmc.mutant_beowolf_medium": "Medium Mutant Beowolf",
+	"entity.grimmmc.mutant_beowolf_large": "Large Mutant Beowolf",
+	"entity.grimmmc.mutant_creep_small": "Small Mutant Creep",
+	"entity.grimmmc.mutant_creep_medium": "Medium Mutant Creep",
+	"entity.grimmmc.mutant_creep_large": "Large Mutant Creep",
+	"entity.grimmmc.mutant_deathstalker_small": "Small Mutant Deathstalker",
+	"entity.grimmmc.mutant_deathstalker_medium": "Medium Mutant Deathstalker",
+	"entity.grimmmc.mutant_deathstalker_large": "Large Mutant Deathstalker",
 	"category.grimmmc": "Grimm Eclipse in Minecraft"
 }

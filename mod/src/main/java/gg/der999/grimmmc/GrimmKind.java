@@ -31,14 +31,39 @@ enum GrimmKind {
 		new String[] {"Swipe", "Smash"}, new float[] {1.83f, 1.17f}, new float[] {0.9f, 0.6f},
 		new float[] {1.2f, 1.8f, 2.6f}, new float[] {1.1f, 1.7f, 2.6f},
 		new double[] {30, 70, 160}, new double[] {3, 5.5, 9}, new double[] {0.30, 0.30, 0.30}, new int[] {2, 3, 4},
-		new float[] {0.18f, 0.28f, 0.45f});
+		new float[] {0.18f, 0.28f, 0.45f}),
+	// The mutants: rare, night-only and very destructive (see GrimmMcMain.spawnTick and GrimmEntity.dig).
+	MUTANT_BEOWOLF("mutant_beowolf", "Idle", "Walk", "Run",
+		new String[] {"GroundPound", "UppercutRight", "Frenzy"}, new float[] {2.08f, 1.33f, 1.83f}, new float[] {1.2f, 0.6f, 0.9f},
+		new float[] {1.6f, 2.4f, 3.4f}, new float[] {2.2f, 3.4f, 5.2f},
+		new double[] {120, 260, 520}, new double[] {5, 9, 16}, new double[] {0.30, 0.30, 0.30}, new int[] {4, 6, 9},
+		new float[] {1.0f, 1.5f, 2.3f}),
+	MUTANT_CREEP("mutant_creep", "Idle", "Walk", "Run",
+		new String[] {"Explode"}, new float[] {1.58f}, new float[] {1.4f},
+		new float[] {0.8f, 1.1f, 1.6f}, new float[] {1.8f, 2.7f, 4.2f},
+		new double[] {40, 90, 200}, new double[] {3, 5, 8}, new double[] {0.34, 0.34, 0.34}, new int[] {3, 4, 6},
+		new float[] {0.6f, 0.9f, 1.4f}),
+	MUTANT_DEATHSTALKER("mutant_deathstalker", "Idle", "Walk", "Run",
+		new String[] {"Swipe", "Smash", "Lunge"}, new float[] {1.83f, 1.17f, 1.83f}, new float[] {0.9f, 0.6f, 0.9f},
+		new float[] {1.6f, 2.4f, 3.6f}, new float[] {1.4f, 2.1f, 3.4f},
+		new double[] {100, 220, 450}, new double[] {5, 9, 15}, new double[] {0.30, 0.30, 0.30}, new int[] {4, 6, 9},
+		new float[] {0.22f, 0.34f, 0.55f});
+
+	boolean mutant() {
+		return this == MUTANT_BEOWOLF || this == MUTANT_CREEP || this == MUTANT_DEATHSTALKER;
+	}
+
+	/** The kinds that spawn in the ordinary way (everything but the mutants). */
+	static final GrimmKind[] REGULAR = {BEOWOLF, CREEP, URSA, BOARBATUSK, DEATHSTALKER};
 
 	/** Seconds the Death animation takes, so the body is removed when it has played. */
 	float deathSeconds() {
 		return switch (this) {
 			case URSA -> 1.9f;
 			case BOARBATUSK -> 1.5f;
-			case DEATHSTALKER -> 3.33f;
+			case DEATHSTALKER, MUTANT_DEATHSTALKER -> 3.33f;
+			case MUTANT_BEOWOLF -> 2.0f;
+			case MUTANT_CREEP -> 1.5f;
 			default -> 2.33f;
 		};
 	}
@@ -50,7 +75,9 @@ enum GrimmKind {
 			case CREEP -> "creep_grunt_";
 			case URSA -> "roar_";
 			case BOARBATUSK -> "boar_spin";
-			case DEATHSTALKER -> "deathstalker_laugh";
+			case DEATHSTALKER, MUTANT_DEATHSTALKER -> "deathstalker_laugh";
+			case MUTANT_BEOWOLF -> "roar_";
+			case MUTANT_CREEP -> "creep_roar_";
 		};
 	}
 

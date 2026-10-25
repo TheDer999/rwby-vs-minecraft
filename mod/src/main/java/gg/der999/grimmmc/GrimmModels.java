@@ -28,6 +28,8 @@ final class GrimmModels {
 		Rig rig;
 		Identifier[] textures;
 		float[] skinned;
+		/** How far the model's feet are below its origin in the idle pose, so it can be lifted onto the ground. */
+		float lift;
 	}
 
 	private static final Map<GrimmKind, Model> MODELS = new EnumMap<>(GrimmKind.class);
@@ -61,6 +63,7 @@ final class GrimmModels {
 					m.textures[i] = id;
 				}
 			}
+			m.lift = idleFootDepth(m.rig);
 			MODELS.put(kind, m);
 			if (GrimmMcClient.AUTO) logBounds(kind.id, m.rig);
 			Sounds.load(d); // the Grimm's voices (a no-op when Ruby has already loaded them)
@@ -71,6 +74,17 @@ final class GrimmModels {
 			GrimmMcClient.LOG.error("Could not load the {} model", kind.id, e);
 			return null;
 		}
+	}
+
+	/** Depth below the origin of the lowest point of the idle pose (0 when the feet are at the origin or above). */
+	static float idleFootDepth(Rig rig) {
+		int ci = rig.findClip("Idle");
+		if (ci < 0) return 0f;
+		float[] out = new float[rig.vertexCount * 3];
+		rig.skin(rig.clips[ci], 0.3f, out);
+		float min = 0f;
+		for (int i = 1; i < out.length; i += 3) min = Math.min(min, out[i]);
+		return -min;
 	}
 
 	/** Developer aid: the posed size of a model in Unity units (before the mod's scale), x width, y height, z length. */
@@ -109,6 +123,7 @@ final class GrimmModels {
 		ms.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(-bodyYaw)); // Unity +Z is the model's front
 		float k = CombatController.SCALE * kind.scale[size];
 		ms.scale(k, k, k);
+		ms.translate(0, m.lift, 0);
 		MatrixStack.Entry entry = ms.peek();
 		Matrix4f mat = entry.getPositionMatrix();
 		int overlay = OverlayTexture.packUv(OverlayTexture.getU(0.0f), OverlayTexture.getV(hurt));

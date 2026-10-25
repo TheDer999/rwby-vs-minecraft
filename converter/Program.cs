@@ -14,7 +14,7 @@ namespace GrimmConvert;
 /// </summary>
 static class Program
 {
-    const string ConverterVersion = "0.5.0";
+    const string ConverterVersion = "0.6.0";
     const string DataFolderPattern = "*_Data";
     const int ExitNotReady = 10;
 
@@ -32,6 +32,11 @@ static class Program
         ["ursa"] = new CharacterSpec("ursa", "Ursa", "Ursa Pelvis", Array.Empty<string>(), "Ursa", "Ursa Body", "Creep Armor"),
         ["boar"] = new CharacterSpec("boar", "Boar_Mesh", "Boar_Pelvis", Array.Empty<string>(), "Boar", "Boar Body D"),
         ["deathstalker"] = new CharacterSpec("deathstalker", "Death_Mesh", "Death_Root", Array.Empty<string>(), "Death", "Deathstalker Body"),
+        // The mutant Grimm: the same skeletons with their own models and textures.
+        ["mutant_beowolf"] = new CharacterSpec("mutant_beowolf", "bodyMesh", "Bip001", Array.Empty<string>(), "BeowolfMutant", "beowolfMutant_01", null,
+            new[] { "Idle", "Walk", "Run", "Death", "Roar", "HitLand01", "HitAir01", "GroundPound", "Frenzy", "UppercutLeft", "UppercutRight", "DashAttack", "Smashed", "Land" }),
+        ["mutant_creep"] = new CharacterSpec("mutant_creep", "Creep Mesh", "MuCreepRoot", Array.Empty<string>(), "CreepMutant", "creepMutant_01"),
+        ["mutant_deathstalker"] = new CharacterSpec("mutant_deathstalker", "MutantDeath Mesh", "Death_Root", Array.Empty<string>(), "DeathMutant", "deathstalkerMutant_01"),
     };
 
     static int Main(string[] args)
@@ -130,7 +135,7 @@ static class Program
 
             Progress(8, total, "Reading the Grimm");
             var grimmOut = new List<object>();
-            foreach (var gid in new[] { "beowolf", "creep", "ursa", "boar", "deathstalker" })
+            foreach (var gid in new[] { "beowolf", "creep", "ursa", "boar", "deathstalker", "mutant_beowolf", "mutant_creep", "mutant_deathstalker" })
             {
                 try
                 {

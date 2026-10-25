@@ -144,8 +144,18 @@ public class GrimmEntity extends HostileEntity {
 	/** The blow of the attack lands: hurts the target if still in reach, and smashes what stands in front. */
 	void strike(LivingEntity target) {
 		if (!(getWorld() instanceof ServerWorld world)) return;
+		if (kind == GrimmKind.MUTANT_CREEP) { explode(world); return; }
 		if (target != null && target.isAlive() && inReach(target)) tryAttack(world, target);
 		dig(world);
+	}
+
+	/** The mutant Creep blows itself up: a big explosion that harms what is near and, unless digging is off or placed blocks are spared, breaks blocks. */
+	void explode(ServerWorld world) {
+		float power = new float[] {2.0f, 3.5f, 6.0f}[size];
+		boolean blocks = Protection.grimmDigs() && !Protection.sparesPlaced() && world.getGameRules().getBoolean(GameRules.DO_MOB_GRIEFING);
+		world.createExplosion(this, getX(), getY() + getHeight() / 2.0, getZ(), power,
+			blocks ? World.ExplosionSourceType.MOB : World.ExplosionSourceType.NONE);
+		kill(world);
 	}
 
 	/** Breaks blocks in front of it, as deep as its size allows (small 1, medium 2, large 4 of a block's hardness). */
@@ -172,6 +182,7 @@ public class GrimmEntity extends HostileEntity {
 
 	static boolean canSpawn(net.minecraft.entity.EntityType<? extends GrimmEntity> type, ServerWorldAccess world, SpawnReason reason, BlockPos pos, Random random) {
 		if (reason == SpawnReason.SPAWNER || reason == SpawnReason.COMMAND || reason == SpawnReason.SPAWN_ITEM_USE) return true;
+		if (kindOf(type).mutant()) return false; // mutants only come from the night spawner
 		if (!GrimmMcClient.CONFIG.grimmSpawn || !GrimmModels.available()) return false;
 		if (world.getDifficulty() == net.minecraft.world.Difficulty.PEACEFUL) return false;
 		if (!world.getBlockState(pos.down()).isSolidBlock(world, pos.down())) return false;
@@ -183,6 +194,13 @@ public class GrimmEntity extends HostileEntity {
 			case 1 -> night;
 			default -> night && random.nextInt(2) == 0;
 		};
+	}
+
+	private static GrimmKind kindOf(EntityType<?> type) {
+		String id = net.minecraft.registry.Registries.ENTITY_TYPE.getId(type).getPath();
+		GrimmKind best = GrimmKind.BEOWOLF;
+		for (GrimmKind k : GrimmKind.values()) if (id.startsWith(k.id + "_") && k.id.length() >= best.id.length()) best = k;
+		return best;
 	}
 
 	private static int sizeOf(EntityType<?> type) {
@@ -251,7 +269,7 @@ public class GrimmEntity extends HostileEntity {
 			g.getLookControl().lookAt(t, 40f, 40f);
 			if (cooldown > 0) cooldown--;
 			// Smash whatever is in the way as it advances (a Grimm does not walk around walls).
-			if (attackLeft <= 0 && g.age % 7 == 0 && g.getWorld() instanceof ServerWorld sw && g.getPos().squaredDistanceTo(lastPos) >= 0 && !g.inReach(t)) {
+			if (attackLeft <= 0 && (g.age % (g.kind.mutant() ? 4 : 7)) == 0 && g.getWorld() instanceof ServerWorld sw && g.getPos().squaredDistanceTo(lastPos) >= 0 && !g.inReach(t)) {
 				double dx = t.getX() - g.getX(), dz = t.getZ() - g.getZ();
 				float yaw = (float) (MathHelper.atan2(-dx, dz) * 57.29577951308232);
 				if (g.horizontalCollision || g.getNavigation().isIdle() || g.squaredDistanceTo(t) > 4) {
