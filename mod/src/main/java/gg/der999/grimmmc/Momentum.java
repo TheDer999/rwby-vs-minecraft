@@ -44,7 +44,7 @@ final class Momentum {
 	/** 0 to 4. */
 	static synchronized int level() {
 		int h = hits(), level = 0;
-		for (int step : STEPS) if (h >= step) level++;
+		for (int step : STEPS) if (h >= Math.round(step * RubyLevel.comboStepScale())) level++;
 		return level;
 	}
 

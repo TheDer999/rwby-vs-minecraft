@@ -73,12 +73,39 @@ final class Protection {
 					})
 					.then(CommandManager.literal("reset").executes(c -> {
 						int old = RubyLevel.reset();
-						c.getSource().sendFeedback(() -> Text.literal("Ruby started over from level " + old + ". Her unlocks are gone until she levels up again."), false);
+						c.getSource().sendFeedback(() -> Text.literal("Ruby went back from level " + old + " to level 1. Her prestige perks stay; the level unlocks come back as she levels up."), false);
 						return 1;
 					}))
 					.then(CommandManager.literal("set").requires(s -> s.hasPermissionLevel(2))
 						.then(CommandManager.argument("level", com.mojang.brigadier.arguments.IntegerArgumentType.integer(1, RubyLevel.MAX)).executes(c -> {
 							RubyLevel.setLevel(com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(c, "level"));
+							c.getSource().sendFeedback(() -> Text.literal(RubyLevel.describe()), false);
+							return 1;
+						}))))
+				.then(CommandManager.literal("prestige")
+					.executes(c -> {
+						int level = RubyLevel.level();
+						if (level < RubyLevel.MAX) {
+							c.getSource().sendFeedback(() -> Text.literal("Prestige needs level " + RubyLevel.MAX + "; Ruby is level " + level + ". " + RubyLevel.describe()), false);
+							return 0;
+						}
+						int p = RubyLevel.prestigeUp();
+						if (p < 0) {
+							c.getSource().sendFeedback(() -> Text.literal("Ruby is already at the top prestige. " + RubyLevel.describe()), false);
+							return 0;
+						}
+						c.getSource().sendFeedback(() -> Text.literal("Ruby prestiged to " + p + " and is level 1 again. New perk: " + RubyLevel.PRESTIGE_PERKS[p - 1]
+							+ ". Mutants are tougher now." + (p >= RubyLevel.MAX_PRESTIGE ? " The Legacy mark is yours for good." : "")), true);
+						return 1;
+					})
+					.then(CommandManager.literal("wipe").then(CommandManager.literal("confirm").executes(c -> {
+						RubyLevel.wipe();
+						c.getSource().sendFeedback(() -> Text.literal("Ruby's level and prestige are erased." + (RubyLevel.legacy() ? " The Legacy mark stays." : "")), true);
+						return 1;
+					})))
+					.then(CommandManager.literal("set").requires(s -> s.hasPermissionLevel(2))
+						.then(CommandManager.argument("prestige", com.mojang.brigadier.arguments.IntegerArgumentType.integer(0, RubyLevel.MAX_PRESTIGE)).executes(c -> {
+							RubyLevel.setPrestige(com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(c, "prestige"));
 							c.getSource().sendFeedback(() -> Text.literal(RubyLevel.describe()), false);
 							return 1;
 						}))))

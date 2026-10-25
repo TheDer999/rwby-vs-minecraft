@@ -337,7 +337,7 @@ final class HitService {
 				breakAll(client, p, around);
 			}
 		}
-		if (!struck.isEmpty()) deliver(client, p, struck, dir.multiply(1, 0, 1).normalize(), h);
+		if (!struck.isEmpty()) deliver(client, p, struck, dir.multiply(1, 0, 1).normalize(), h, RubyLevel.shotDamageScale());
 	}
 
 	/** The first thing the camera's centre line meets (an enemy or a block), or a far point if it meets nothing. */
@@ -403,7 +403,7 @@ final class HitService {
 		ServerPlayerEntity player = server.getPlayerManager().getPlayer(playerId);
 		if (world == null || player == null) return;
 		int level = Momentum.level();
-		damage *= Momentum.damageMultiplier(level); // the combo's power level makes every hit stronger
+		damage *= Momentum.damageMultiplier(level) * RubyLevel.damageBonus(); // the combo's power level and prestige make every hit stronger
 		for (UUID id : targets) {
 			Entity e = world.getEntity(id);
 			if (!(e instanceof LivingEntity target) || !target.isAlive()) continue;

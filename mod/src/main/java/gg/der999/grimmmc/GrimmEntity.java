@@ -92,6 +92,20 @@ public class GrimmEntity extends HostileEntity {
 		}
 	}
 
+	/** A new mutant is as tough as the player's prestige makes it (summoned ones too). */
+	@Override
+	public net.minecraft.entity.EntityData initialize(net.minecraft.world.ServerWorldAccess world, net.minecraft.world.LocalDifficulty difficulty, SpawnReason reason, net.minecraft.entity.EntityData data) {
+		net.minecraft.entity.EntityData result = super.initialize(world, difficulty, reason, data);
+		if (kind.mutant() && RubyLevel.prestige() > 0) {
+			var health = getAttributeInstance(EntityAttributes.MAX_HEALTH);
+			var damage = getAttributeInstance(EntityAttributes.ATTACK_DAMAGE);
+			if (health != null) health.setBaseValue(kind.health[size] * RubyLevel.mutantHealthScale());
+			if (damage != null) damage.setBaseValue(kind.damage[size] * RubyLevel.mutantDamageScale());
+			setHealth(getMaxHealth());
+		}
+		return result;
+	}
+
 	GrimmKind kind() { return kind; }
 
 	int size() { return size; }
@@ -179,7 +193,7 @@ public class GrimmEntity extends HostileEntity {
 	/** Breaks blocks in front of it, as deep as its size allows (small 1, medium 2, large 4 of a block's hardness). */
 	void dig(ServerWorld world) {
 		if (!Protection.grimmDigs() || !world.getGameRules().getBoolean(GameRules.DO_MOB_GRIEFING)) return;
-		int budget = kind.dig[size];
+		int budget = kind.dig[size] + (kind.mutant() ? RubyLevel.mutantDigBonus() : 0);
 		float yaw = getBodyYaw() * MathHelper.RADIANS_PER_DEGREE;
 		Vec3d fwd = new Vec3d(-MathHelper.sin(yaw), 0, MathHelper.cos(yaw));
 		Vec3d right = new Vec3d(-MathHelper.cos(yaw), 0, -MathHelper.sin(yaw));

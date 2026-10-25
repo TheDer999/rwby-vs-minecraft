@@ -615,7 +615,8 @@ public final class CombatController {
 		MinecraftClient client = MinecraftClient.getInstance();
 		// level 10: the Crescendo reaches almost twice as far, hits twice as hard and digs three deep
 		boolean ultimate = RubyLevel.bigCrescendo() && move != null && "Crescendo".equals(move.ability.coroutine);
-		HitService.hit(client, this, atk, ultimate ? 1.8f : 1f, ultimate ? 2f : 1f);
+		boolean crescendo = move != null && "Crescendo".equals(move.ability.coroutine);
+		HitService.hit(client, this, atk, ultimate ? 1.8f : 1f, (ultimate ? 2f : 1f) * (crescendo ? RubyLevel.crescendoDamageScale() : 1f));
 		// Each attack of a combo digs into dirt along its swing, once per move.
 		int depth = ultimate ? 3 : breakDepth();
 		if (move != null && "Heavy".equals(move.ability.coroutine) && slot == 1) depth = 2; // the uncharged heavy

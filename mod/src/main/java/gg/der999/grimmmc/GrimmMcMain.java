@@ -44,6 +44,19 @@ public class GrimmMcMain implements ModInitializer {
 			}
 		}
 		net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents.END_WORLD_TICK.register(GrimmMcMain::spawnTick);
+		// Prestige 5: +10% movement speed while the player is Ruby.
+		net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents.END_SERVER_TICK.register(server -> {
+			if (server.getTicks() % 10 != 0) return;
+			for (net.minecraft.server.network.ServerPlayerEntity pl : server.getPlayerManager().getPlayerList()) {
+				var speed = pl.getAttributeInstance(net.minecraft.entity.attribute.EntityAttributes.MOVEMENT_SPEED);
+				if (speed == null) continue;
+				Identifier mod = Identifier.of("grimmmc", "prestige_speed");
+				boolean want = GrimmMcClient.possessed && RubyLevel.fasterRuby();
+				boolean has = speed.getModifier(mod) != null;
+				if (want && !has) speed.addTemporaryModifier(new net.minecraft.entity.attribute.EntityAttributeModifier(mod, 0.10, net.minecraft.entity.attribute.EntityAttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
+				else if (!want && has) speed.removeModifier(mod);
+			}
+		});
 		// A Grimm the player kills, as Ruby or as Steve, earns points toward Ruby's level.
 		net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> {
 			if (entity instanceof GrimmEntity grimm && source.getAttacker() instanceof net.minecraft.server.network.ServerPlayerEntity player) {
@@ -58,14 +71,14 @@ public class GrimmMcMain implements ModInitializer {
 	 */
 	static boolean spawnMutant(net.minecraft.server.world.ServerWorld world, net.minecraft.server.network.ServerPlayerEntity player, net.minecraft.util.math.random.Random r, boolean force) {
 		if (!force) {
-			int rarity = GrimmMcClient.CONFIG.mutantRarity;
+			int rarity = RubyLevel.mutantRarity(GrimmMcClient.CONFIG.mutantRarity);
 			if (rarity <= 0 || r.nextInt(rarity) != 0) return false;
 			java.util.List<GrimmEntity> near = world.getEntitiesByClass(GrimmEntity.class, player.getBoundingBox().expand(150), e -> e.kind().mutant());
 			if (!near.isEmpty()) return false;
 		}
 		GrimmKind[] mutants = {GrimmKind.MUTANT_BEOWOLF, GrimmKind.MUTANT_CREEP, GrimmKind.MUTANT_DEATHSTALKER};
 		GrimmKind kind = mutants[r.nextInt(mutants.length)];
-		int size = r.nextInt(100) < 65 ? 1 : 2;
+		int size = r.nextInt(100) < RubyLevel.mutantMediumChance() ? 1 : 2;
 		for (int attempt = 0; attempt < 24; attempt++) {
 			if (attempt == 12) size = 1; // big hitboxes rarely fit on uneven ground: fall back to medium
 			double angle = r.nextDouble() * Math.PI * 2, dist = 36 + r.nextDouble() * 20;

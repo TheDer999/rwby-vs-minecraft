@@ -104,8 +104,9 @@ final class RubyStats {
 		int rubyLevel = RubyLevel.level();
 		ctx.fill(x - 1, y + 32, x + W + 1, y + 37, 0xAA000000);
 		ctx.fill(x, y + 33, x + W, y + 36, 0xFF3A2F52);
-		ctx.fill(x, y + 33, x + Math.round(W * RubyLevel.progress()), y + 36, 0xFFB48CFF);
-		ctx.drawText(client.textRenderer, "Level " + rubyLevel + (rubyLevel >= RubyLevel.MAX ? " (max)" : ""), x + W + 6, y + 32, 0xFFFFFFFF, true);
+		ctx.fill(x, y + 33, x + Math.round(W * RubyLevel.progress()), y + 36, RubyLevel.legacy() ? 0xFFFFD34D : 0xFFB48CFF);
+		int prestige = RubyLevel.prestige();
+		ctx.drawText(client.textRenderer, "Level " + rubyLevel + (rubyLevel >= RubyLevel.MAX ? " (max)" : "") + (prestige > 0 ? "  Prestige " + prestige : "") + (RubyLevel.legacy() ? "  Legacy" : ""), x + W + 6, y + 32, RubyLevel.legacy() ? 0xFFFFD34D : 0xFFFFFFFF, true);
 		int combo = Momentum.hits();
 		if (combo > 0) {
 			int level = Momentum.level();

@@ -172,6 +172,7 @@ public class GrimmMcClient implements ClientModInitializer {
 				else if (AUTO_MODE.equals("grimmkill")) autoGrimmKill(client);
 				else if (AUTO_MODE.equals("grimmdie")) autoGrimmDie(client);
 				else if (AUTO_MODE.equals("grimmlevel")) autoGrimmLevel(client);
+				else if (AUTO_MODE.equals("grimmprestige")) autoGrimmPrestige(client);
 				else if (AUTO_MODE.equals("grimmspawn")) autoGrimmSpawn(client);
 				else if (AUTO_MODE.equals("placed")) autoStep(client);
 			}
@@ -756,6 +757,42 @@ public class GrimmMcClient implements ClientModInitializer {
 			LOG.info("GRIMM-TEST fight: playerHp={} sounds started={} failed={} {}", p.getHealth(), Sounds.STARTED.get(), Sounds.FAILED.get(), sb);
 		}
 		if (n == 305) client.scheduleStop();
+	}
+
+	/** Grimm self test 8: prestige. Levels up to 10, prestiges, checks the perks and how tough a new mutant is at prestige 0 and 6. */
+	static void autoGrimmPrestige(MinecraftClient client) {
+		autoTicks++;
+		int n = autoTicks;
+		var p = client.player;
+		var net = p.networkHandler;
+		if (n == 92 && net != null) net.sendChatCommand("gamemode creative");
+		if (n == 93 && net != null) net.sendChatCommand("grimmmc prestige set 0");
+		if (n == 94 && net != null) net.sendChatCommand("grimmmc level set 5");
+		if (n == 95 && net != null) net.sendChatCommand("grimmmc prestige");
+		if (n == 96 && net != null) net.sendChatCommand("grimmmc level set 10");
+		if (n == 97 && net != null) net.sendChatCommand("summon grimmmc:mutant_beowolf_medium ~ ~ ~14");
+		if (n == 100) logPrestige(client, "prestige 0, level 10");
+		if (n == 101 && net != null) net.sendChatCommand("grimmmc prestige");
+		if (n == 103 && net != null) net.sendChatCommand("grimmmc prestige set 6");
+		if (n == 104 && net != null) net.sendChatCommand("summon grimmmc:mutant_beowolf_medium ~ ~ ~16");
+		if (n == 108) logPrestige(client, "prestige 6");
+		if (n == 109 && net != null) net.sendChatCommand("grimmmc level set 10");
+		if (n == 110 && net != null) net.sendChatCommand("grimmmc prestige set 9");
+		if (n == 111 && net != null) net.sendChatCommand("grimmmc prestige");
+		if (n == 112 && net != null) net.sendChatCommand("grimmmc prestige");
+		if (n == 114) logPrestige(client, "after the 10th prestige");
+		if (n == 115 && net != null) net.sendChatCommand("grimmmc prestige wipe confirm");
+		if (n == 118) logPrestige(client, "after wipe");
+		if (n == 120) client.scheduleStop();
+	}
+
+	private static void logPrestige(MinecraftClient client, String label) {
+		StringBuilder sb = new StringBuilder();
+		for (net.minecraft.entity.Entity e : client.world.getEntities())
+			if (e instanceof GrimmEntity g && g.kind().mutant()) sb.append(String.format("[%s maxHp=%.0f dmg=%.1f] ", g.getType().getUntranslatedName(), g.getMaxHealth(),
+				g.getAttributeValue(net.minecraft.entity.attribute.EntityAttributes.ATTACK_DAMAGE)));
+		LOG.info("GRIMM-TEST prestige ({}): level={} prestige={} legacy={} aura={} hitsPerSpecial={} dmgBonus={} mutants {}",
+			label, RubyLevel.level(), RubyLevel.prestige(), RubyLevel.legacy(), RubyStats.maxShield(), RubyStats.hitsPerSpecial(), RubyLevel.damageBonus(), sb);
 	}
 
 	/** Grimm self test 7: Ruby shoots a row of Grimm at the level given in GRIMMMC_LEVEL; logs what each lost (piercing and bursting shots). */

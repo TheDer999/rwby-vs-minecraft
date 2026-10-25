@@ -37,12 +37,34 @@ final class RubyLevel {
 		"a far bigger Crescendo",
 	};
 
+	/** What each prestige (1 to 10) gives for good, in the order earned. */
+	static final String[] PRESTIGE_PERKS = {
+		"+10% damage",
+		"+15% aura",
+		"kills heal 25% more",
+		"the Special fills 3 hits sooner",
+		"+10% movement speed as Ruby",
+		"sniper shots do 50% more damage",
+		"the Crescendo does 50% more damage from level 5 on",
+		"the aura recharges 25% quicker",
+		"combo power levels come 25% sooner",
+		"+25% damage and the Legacy mark",
+	};
+	static final int MAX_PRESTIGE = 10;
+
 	private static int points;
 	private static int resets;
+	private static int prestige;
+	private static boolean legacy;
 	private static boolean loaded;
 
 	private static Path file() {
 		return GrimmMcClient.CONFIG.home.resolve("ruby_level.properties");
+	}
+
+	/** The Legacy mark lives in its own file so that wiping everything else leaves it alone. */
+	private static Path legacyFile() {
+		return GrimmMcClient.CONFIG.home.resolve("ruby_legacy.properties");
 	}
 
 	private static void load() {
@@ -55,9 +77,12 @@ final class RubyLevel {
 			p.load(in);
 			points = Math.max(0, Integer.parseInt(p.getProperty("points", "0").trim()));
 			resets = Math.max(0, Integer.parseInt(p.getProperty("resets", "0").trim()));
+			prestige = Math.max(0, Math.min(MAX_PRESTIGE, Integer.parseInt(p.getProperty("prestige", "0").trim())));
 		} catch (IOException | NumberFormatException e) {
 			GrimmMcClient.LOG.warn("Could not read {}: {}", f, e.toString());
 		}
+		Path lf = legacyFile();
+		if (Files.isRegularFile(lf)) legacy = true;
 	}
 
 	private static void save() {
@@ -66,6 +91,7 @@ final class RubyLevel {
 			Properties p = new Properties();
 			p.setProperty("points", Integer.toString(points));
 			p.setProperty("resets", Integer.toString(resets));
+			p.setProperty("prestige", Integer.toString(prestige));
 			try (OutputStream out = Files.newOutputStream(file())) {
 				p.store(out, "Ruby's level: Grimm Eclipse in Minecraft");
 			}
@@ -135,14 +161,14 @@ final class RubyLevel {
 
 	private static void announce(ServerPlayerEntity player, int level) {
 		String unlock = level >= 2 ? UNLOCKS[level - 2] : "";
-		String text = "Ruby reached level " + level + (unlock.isEmpty() ? "" : ": " + unlock) + (level == MAX ? ". Keep it, or start over with /grimmmc level reset." : ".");
+		String text = "Ruby reached level " + level + (unlock.isEmpty() ? "" : ": " + unlock) + (level == MAX ? (prestige() < MAX_PRESTIGE ? ". Prestige with /grimmmc prestige for a permanent perk, or keep going." : ". That is the top.") : ".");
 		player.sendMessage(Text.literal(text), false);
 		var world = player.getServerWorld();
 		world.playSound(null, player.getBlockPos(), SoundEvents.ENTITY_PLAYER_LEVELUP, SoundCategory.PLAYERS, 0.9f, 1.0f);
 		world.spawnParticles(ParticleTypes.END_ROD, player.getX(), player.getBodyY(0.6), player.getZ(), 24, 0.5, 0.7, 0.5, 0.05);
 	}
 
-	/** Back to level 1 (the player chose to start over); returns the old level. */
+	/** Back to level 1, keeping prestige; returns the old level. */
 	static synchronized int reset() {
 		load();
 		int old = levelFor(points);
@@ -160,11 +186,65 @@ final class RubyLevel {
 		save();
 	}
 
+	// ---- prestige
+
+	static synchronized int prestige() {
+		load();
+		return prestige;
+	}
+
+	static synchronized boolean legacy() {
+		load();
+		return legacy;
+	}
+
+	/** At level 10 with prestige to spare: back to level 1 with one more permanent perk. Returns the new prestige, or -1 if not allowed. */
+	static synchronized int prestigeUp() {
+		load();
+		if (levelFor(points) < MAX || prestige >= MAX_PRESTIGE) return -1;
+		prestige++;
+		points = 0;
+		if (prestige >= MAX_PRESTIGE && !legacy) {
+			legacy = true;
+			try {
+				Files.createDirectories(legacyFile().getParent());
+				Files.writeString(legacyFile(), "legacy=true\n");
+			} catch (IOException e) {
+				GrimmMcClient.LOG.warn("Could not write {}: {}", legacyFile(), e.toString());
+			}
+		}
+		save();
+		return prestige;
+	}
+
+	/** Sets the prestige directly (for ops and tests); the Legacy mark is only ever earned by prestiging. */
+	static synchronized void setPrestige(int p) {
+		load();
+		prestige = Math.max(0, Math.min(MAX_PRESTIGE, p));
+		save();
+	}
+
+	/** Erases the level and every prestige perk; the Legacy mark, if earned, stays. */
+	static synchronized void wipe() {
+		load();
+		points = 0;
+		prestige = 0;
+		resets = 0;
+		save();
+	}
+
 	static String describe() {
 		int level = level();
 		int need = nextNeeded();
-		return "Ruby is level " + level + (level >= MAX ? " (the top" + (resets() > 0 ? ", started over " + resets() + " time" + (resets() == 1 ? "" : "s") : "") + ")" : " with " + points() + " of " + need + " points for level " + (level + 1))
-			+ ". Unlocked: " + unlocked(level) + ".";
+		int p = prestige();
+		StringBuilder sb = new StringBuilder("Ruby is level " + level + (level >= MAX ? " (the top)" : " with " + points() + " of " + need + " points for level " + (level + 1)));
+		sb.append(p > 0 ? ", prestige " + p : ", no prestige yet").append(legacy() ? ", Legacy" : "").append(". Unlocked: ").append(unlocked(level)).append(".");
+		if (p > 0) {
+			sb.append(" Prestige perks:");
+			for (int i = 0; i < p; i++) sb.append(i > 0 ? ";" : "").append(" ").append(i + 1).append(": ").append(PRESTIGE_PERKS[i]);
+			sb.append(".");
+		}
+		return sb.toString();
 	}
 
 	private static String unlocked(int level) {
@@ -174,15 +254,19 @@ final class RubyLevel {
 		return sb.toString();
 	}
 
-	// ---- what the levels unlock
+	// ---- what the levels and prestige unlock
 
 	static float auraMultiplier() {
-		int l = level();
-		return l >= 8 ? 1.25f : l >= 2 ? 1.1f : 1f;
+		int l = level(), p = prestige();
+		float m = l >= 8 ? 1.25f : l >= 2 ? 1.1f : 1f;
+		if (p >= 2) m += 0.15f;
+		if (legacy()) m += 0.05f;
+		return m;
 	}
 
 	static float auraRechargeFactor() {
-		return level() >= 8 ? 0.75f : 1f;
+		float f = level() >= 8 ? 0.75f : 1f;
+		return prestige() >= 8 ? f * 0.75f : f;
 	}
 
 	static boolean piercingShots() { return level() >= 3; }
@@ -191,11 +275,53 @@ final class RubyLevel {
 
 	static long comboWindowMs() { return level() >= 4 ? 4500 : 3000; }
 
-	static float healMultiplier() { return level() >= 6 ? 1.5f : 1f; }
+	static float healMultiplier() {
+		float m = level() >= 6 ? 1.5f : 1f;
+		return prestige() >= 3 ? m * 1.25f : m;
+	}
 
-	static int hitsPerSpecial() { return level() >= 7 ? 18 : 24; }
+	static int hitsPerSpecial() {
+		int h = level() >= 7 ? 18 : 24;
+		return prestige() >= 4 ? h - 3 : h;
+	}
 
 	static boolean reapArea() { return level() >= 9; }
 
 	static boolean bigCrescendo() { return level() >= 10; }
+
+	/** Prestige 1 gives +10% and prestige 10 another +25% on everything Ruby hits. */
+	static float damageBonus() {
+		int p = prestige();
+		return 1f + (p >= 1 ? 0.10f : 0f) + (p >= 10 ? 0.25f : 0f);
+	}
+
+	/** Prestige 6: sniper shots do 50% more. */
+	static float shotDamageScale() { return prestige() >= 6 ? 1.5f : 1f; }
+
+	/** Prestige 7: from level 5 on the Crescendo does 50% more. */
+	static float crescendoDamageScale() { return prestige() >= 7 && level() >= 5 ? 1.5f : 1f; }
+
+	/** Prestige 9: the combo reaches its power levels in three quarters of the attacks. */
+	static float comboStepScale() { return prestige() >= 9 ? 0.75f : 1f; }
+
+	/** Prestige 5: +10% movement speed while she is Ruby. */
+	static boolean fasterRuby() { return prestige() >= 5; }
+
+	// ---- the mutants grow with prestige
+
+	/** Mutants spawn up to 40% more often at prestige 10 (rarity is the number of checks per mutant, so smaller is more often). */
+	static int mutantRarity(int base) { return Math.max(1, Math.round(base * (1f - 0.04f * prestige()))); }
+
+	static float mutantHealthScale() { return 1f + 0.10f * prestige(); }
+
+	static float mutantDamageScale() { return 1f + 0.06f * prestige(); }
+
+	/** Mutants dig 1 deeper from prestige 4 and 1 more from prestige 8. */
+	static int mutantDigBonus() {
+		int p = prestige();
+		return (p >= 4 ? 1 : 0) + (p >= 8 ? 1 : 0);
+	}
+
+	/** Chance in percent that a mutant is a medium one rather than a large one (65 at prestige 0, 35 at prestige 10). */
+	static int mutantMediumChance() { return 65 - 3 * prestige(); }
 }
