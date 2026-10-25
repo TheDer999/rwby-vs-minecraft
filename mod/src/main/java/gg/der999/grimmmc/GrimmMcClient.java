@@ -691,18 +691,12 @@ public class GrimmMcClient implements ClientModInitializer {
 		if (n == 92 && net != null) net.sendChatCommand("gamemode creative");
 		if (n == 94 && net != null) net.sendChatCommand("time set noon");
 		if (n == 96 && net != null) {
-			net.sendChatCommand("summon grimmmc:mutant_beowolf_medium ~-3 ~ ~9 {NoAI:1b,Rotation:[180f,0f]}");
-			net.sendChatCommand("summon grimmmc:mutant_beowolf_large ~7 ~ ~14 {NoAI:1b,Rotation:[180f,0f]}");
-			net.sendChatCommand("summon grimmmc:beowolf_medium ~-9 ~ ~10 {NoAI:1b,Rotation:[180f,0f]}");
+			net.sendChatCommand("summon grimmmc:mutant_beowolf_medium ~-5 ~ ~12 {NoAI:1b,Rotation:[180f,0f]}");
+			net.sendChatCommand("summon grimmmc:mutant_creep_medium ~5 ~ ~10 {NoAI:1b,Rotation:[180f,0f]}");
+			net.sendChatCommand("summon grimmmc:beowolf_medium ~0 ~ ~16 {NoAI:1b,Rotation:[180f,0f]}");
 		}
-		if (n == 130) shoot(client);
-		if (n == 135 && net != null) net.sendChatCommand("data merge entity @e[type=grimmmc:mutant_beowolf_medium,limit=1] {NoAI:0b}");
-		if (n == 136 && net != null) net.sendChatCommand("gamemode survival");
-		if (n == 137 && net != null) net.sendChatCommand("effect give @s minecraft:resistance 900 4 true");
-		if (n == 175) shoot(client);
-		if (n == 215) shoot(client);
-		if (n == 260) shoot(client);
-		if (n == 270) client.scheduleStop();
+		if (n == 130 || n == 150 || n == 170) shoot(client);
+		if (n == 180) client.scheduleStop();
 	}
 	static int wallBefore;
 

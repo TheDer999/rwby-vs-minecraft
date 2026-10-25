@@ -50,7 +50,7 @@ final class GrimmConfig {
 	final boolean grimmSpawn;
 	/** Scales how many Grimm are kept around each player (config key grimm_spawn_multiplier, default 1: up to 5 by day and 14 at night). */
 	final float grimmSpawnMultiplier;
-	/** On average one mutant Grimm per this many 3-second checks per player at night (config key mutant_rarity, default 60, about one every 3 minutes; 0 turns them off). */
+	/** On average one mutant Grimm per this many 3-second checks per player at night (config key mutant_rarity, default 40, about one every 2 minutes; 0 turns them off). */
 	final int mutantRarity;
 	/** Whether blocks players placed are spared by Ruby and the Grimm (config key spare_placed, default false). */
 	final boolean sparePlaced;
@@ -127,7 +127,7 @@ final class GrimmConfig {
 			!"false".equalsIgnoreCase(p.getProperty("grimm_break_blocks", "true").trim()),
 			!"false".equalsIgnoreCase(p.getProperty("grimm_spawn", "true").trim()),
 			Math.max(0f, Math.min(5f, number(p, "grimm_spawn_multiplier", 1f))),
-			Math.max(0, Math.round(number(p, "mutant_rarity", 60f))),
+			Math.max(0, Math.round(number(p, "mutant_rarity", 40f))),
 			"true".equalsIgnoreCase(p.getProperty("spare_placed", "false").trim()),
 			"true".equalsIgnoreCase(p.getProperty("debug", "false").trim()));
 	}

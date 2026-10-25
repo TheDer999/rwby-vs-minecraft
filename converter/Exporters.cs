@@ -318,7 +318,15 @@ static class Exporters
         sb.Append("\"bindPoses\":[" + string.Join(",", bind.Select(m => "[" + string.Join(",", m.Select(F)) + "]")) + "],\n");
         sb.Append("\"meshBones\":[" + string.Join(",", meshBones) + "],\n");
         // Only models whose prefab stands the skeleton upright with a rotation above it (the mutant Beowolf, turned 90 degrees) need it.
-        if (rootMatrix != null && spec.UseRoot) { rootMatrix[3] = 0; rootMatrix[7] = 0; rootMatrix[11] = 0; sb.Append("\"root\":[" + string.Join(",", rootMatrix.Select(F)) + "],\n"); }
+        if (rootMatrix != null && spec.UseRoot)
+        {
+            rootMatrix[3] = 0; rootMatrix[7] = 0; rootMatrix[11] = 0;
+            for (int c = 0; c < 3; c++) // keep only the rotation: the model scale is applied by the mod
+            {
+                float len = MathF.Sqrt(rootMatrix[c] * rootMatrix[c] + rootMatrix[4 + c] * rootMatrix[4 + c] + rootMatrix[8 + c] * rootMatrix[8 + c]);
+                if (len > 1e-6f) { rootMatrix[c] /= len; rootMatrix[4 + c] /= len; rootMatrix[8 + c] /= len; }
+            }
+            sb.Append("\"root\":[" + string.Join(",", rootMatrix.Select(F)) + "],\n"); }
         sb.Append("\"nodes\":[\n" + string.Join(",\n", nodes.Select(p =>
         {
             var parentPath = p.Contains('/') ? p.Substring(0, p.LastIndexOf('/')) : null;

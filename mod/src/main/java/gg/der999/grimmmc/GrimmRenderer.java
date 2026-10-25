@@ -62,6 +62,8 @@ public class GrimmRenderer extends EntityRenderer<GrimmEntity, GrimmRenderer.Sta
 			s.clip = k.idle;
 			s.time = s.age / 20f;
 		}
+		String forced = System.getenv("GRIMMMC_FORCECLIP"); // self tests only
+		if (GrimmMcClient.AUTO && forced != null && !forced.isBlank()) { s.clip = forced; s.time = s.age / 20f; s.loop = true; }
 	}
 
 	@Override

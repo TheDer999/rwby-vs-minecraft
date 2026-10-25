@@ -50,16 +50,19 @@ public class GrimmMcMain implements ModInitializer {
 	 * A mutant Grimm, rare and only at night: on average once in `mutant_rarity` checks (every 3 seconds) per player, never while one
 	 * is already near, medium or large, 40 to 60 blocks away.
 	 */
-	private static void spawnMutant(net.minecraft.server.world.ServerWorld world, net.minecraft.server.network.ServerPlayerEntity player, net.minecraft.util.math.random.Random r) {
-		int rarity = GrimmMcClient.CONFIG.mutantRarity;
-		if (rarity <= 0 || r.nextInt(rarity) != 0) return;
-		java.util.List<GrimmEntity> near = world.getEntitiesByClass(GrimmEntity.class, player.getBoundingBox().expand(150), e -> e.kind().mutant());
-		if (!near.isEmpty()) return;
+	static boolean spawnMutant(net.minecraft.server.world.ServerWorld world, net.minecraft.server.network.ServerPlayerEntity player, net.minecraft.util.math.random.Random r, boolean force) {
+		if (!force) {
+			int rarity = GrimmMcClient.CONFIG.mutantRarity;
+			if (rarity <= 0 || r.nextInt(rarity) != 0) return false;
+			java.util.List<GrimmEntity> near = world.getEntitiesByClass(GrimmEntity.class, player.getBoundingBox().expand(150), e -> e.kind().mutant());
+			if (!near.isEmpty()) return false;
+		}
 		GrimmKind[] mutants = {GrimmKind.MUTANT_BEOWOLF, GrimmKind.MUTANT_CREEP, GrimmKind.MUTANT_DEATHSTALKER};
 		GrimmKind kind = mutants[r.nextInt(mutants.length)];
 		int size = r.nextInt(100) < 65 ? 1 : 2;
-		for (int attempt = 0; attempt < 6; attempt++) {
-			double angle = r.nextDouble() * Math.PI * 2, dist = 40 + r.nextDouble() * 20;
+		for (int attempt = 0; attempt < 24; attempt++) {
+			if (attempt == 12) size = 1; // big hitboxes rarely fit on uneven ground: fall back to medium
+			double angle = r.nextDouble() * Math.PI * 2, dist = 36 + r.nextDouble() * 20;
 			int x = net.minecraft.util.math.MathHelper.floor(player.getX() + Math.cos(angle) * dist);
 			int z = net.minecraft.util.math.MathHelper.floor(player.getZ() + Math.sin(angle) * dist);
 			if (!world.isChunkLoaded(x >> 4, z >> 4)) continue;
@@ -68,13 +71,14 @@ public class GrimmMcMain implements ModInitializer {
 			if (!world.getBlockState(pos.down()).isSolidBlock(world, pos.down()) || !world.getFluidState(pos).isEmpty()) continue;
 			GrimmEntity g = TYPES.get(kind.ordinal() * 3 + size).create(world, net.minecraft.entity.SpawnReason.NATURAL);
 			if (g == null) continue;
-			g.refreshPositionAndAngles(x + 0.5, y, z + 0.5, r.nextFloat() * 360f, 0f);
+			g.refreshPositionAndAngles(x + 0.5, y + 0.1, z + 0.5, r.nextFloat() * 360f, 0f);
 			if (!world.isSpaceEmpty(g)) { g.discard(); continue; }
 			g.initialize(world, world.getLocalDifficulty(pos), net.minecraft.entity.SpawnReason.NATURAL, null);
 			world.spawnEntityAndPassengers(g);
 			if (GrimmMcClient.AUTO) GrimmMcClient.LOG.info("GRIMM-TEST a mutant spawned: {} at {} blocks from the player", kind.entityName(size), (int) Math.sqrt(g.squaredDistanceTo(player)));
-			return;
+			return true;
 		}
+		return false;
 	}
 
 	/**
@@ -93,7 +97,7 @@ public class GrimmMcMain implements ModInitializer {
 			net.minecraft.util.math.Box area = player.getBoundingBox().expand(80);
 			int near = world.getEntitiesByClass(GrimmEntity.class, area, e -> true).size();
 			net.minecraft.util.math.random.Random r = world.getRandom();
-			if (night) spawnMutant(world, player, r);
+			if (night) spawnMutant(world, player, r, false);
 			if (near >= cap) continue;
 			// kind and size: by day only small ones; at night a mix, weighted to the bigger ones the later it is
 			GrimmKind kind = GrimmKind.REGULAR[r.nextInt(GrimmKind.REGULAR.length)];

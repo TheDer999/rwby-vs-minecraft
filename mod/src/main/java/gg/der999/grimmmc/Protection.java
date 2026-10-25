@@ -66,6 +66,12 @@ final class Protection {
 						c.getSource().sendFeedback(() -> Text.literal(describe()), false);
 						return 1;
 					}))))
+				.then(CommandManager.literal("mutant").requires(s -> s.hasPermissionLevel(2)).executes(c -> {
+					var player = c.getSource().getPlayerOrThrow();
+					boolean ok = GrimmMcMain.spawnMutant(c.getSource().getWorld(), player, player.getRandom(), true);
+					c.getSource().sendFeedback(() -> Text.literal(ok ? "A mutant Grimm appeared 36 to 56 blocks away." : "No room found for a mutant Grimm here, try again."), false);
+					return ok ? 1 : 0;
+				}))
 				.then(CommandManager.literal("spare-placed").then(CommandManager.argument("on", BoolArgumentType.bool()).executes(c -> {
 					set(2, BoolArgumentType.getBool(c, "on"));
 					c.getSource().sendFeedback(() -> Text.literal(describe()), false);
