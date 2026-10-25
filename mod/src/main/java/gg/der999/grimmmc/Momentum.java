@@ -15,7 +15,7 @@ final class Momentum {
 	private Momentum() {}
 
 	/** The combo breaks when no hit lands for this long. */
-	static final long WINDOW_MS = 3000;
+	static long windowMs() { return RubyLevel.comboWindowMs(); }
 	/** Attacks that connect in a combo needed for power level 1, 2, 3 and 4. */
 	static final int[] STEPS = {4, 10, 20, 35};
 	/** The speed and resistance effects last this long (they are refreshed by every hit). */
@@ -31,14 +31,14 @@ final class Momentum {
 
 	static synchronized void hit(int n) {
 		long now = System.currentTimeMillis();
-		if (now - last > WINDOW_MS) hits = 0;
+		if (now - last > windowMs()) hits = 0;
 		hits += n;
 		last = now;
 	}
 
 	/** Hits in the running combo, 0 once it has broken. */
 	static synchronized int hits() {
-		return System.currentTimeMillis() - last > WINDOW_MS ? 0 : hits;
+		return System.currentTimeMillis() - last > windowMs() ? 0 : hits;
 	}
 
 	/** 0 to 4. */
@@ -50,7 +50,7 @@ final class Momentum {
 
 	/** How much of the window is left, 0 to 1 (for the HUD). */
 	static synchronized float remaining() {
-		return MathHelper.clamp(1f - (System.currentTimeMillis() - last) / (float) WINDOW_MS, 0f, 1f);
+		return MathHelper.clamp(1f - (System.currentTimeMillis() - last) / (float) windowMs(), 0f, 1f);
 	}
 
 	/** Her hits do 10% more per level. */
@@ -67,6 +67,6 @@ final class Momentum {
 	/** Health a kill gives back, in health points: a tenth of the victim's health (at least one point, at most six), up to twice that at power level 4. */
 	static float healFor(LivingEntity victim, int level) {
 		float base = MathHelper.clamp(victim.getMaxHealth() * 0.10f, 1f, 6f);
-		return base * (1f + 0.25f * level);
+		return base * (1f + 0.25f * level) * RubyLevel.healMultiplier();
 	}
 }

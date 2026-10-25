@@ -45,6 +45,11 @@ final class HitService {
 	}
 
 	static void hit(MinecraftClient client, CombatController combat, CombatData.Attack atk) {
+		hit(client, combat, atk, 1f, 1f);
+	}
+
+	/** An attack with its volume and damage scaled (the level 10 Crescendo). */
+	static void hit(MinecraftClient client, CombatController combat, CombatData.Attack atk, float radiusScale, float damageScale) {
 		if (atk == null || atk.hit == null || !atk.hasVolume) return;
 		PlayerEntity p = client.player;
 		if (p == null || client.world == null) return;
@@ -56,7 +61,7 @@ final class HitService {
 			.add(right.multiply(atk.offset[0] * s))
 			.add(0, atk.offset[1] * s, 0)
 			.add(fwd.multiply(atk.offset[2] * s));
-		double radius = atk.radius * s;
+		double radius = atk.radius * s * radiusScale;
 
 		List<UUID> targets = new ArrayList<>();
 		Box search = new Box(center, center).expand(radius);
@@ -67,7 +72,7 @@ final class HitService {
 			double dz = MathHelper.clamp(center.z, b.minZ, b.maxZ) - center.z;
 			if (dx * dx + dy * dy + dz * dz <= radius * radius) targets.add(e.getUuid());
 		}
-		deliver(client, p, targets, fwd, atk.hit);
+		deliver(client, p, targets, fwd, atk.hit, damageScale);
 	}
 
 	/** Sand, gravel, wood, leaves and glass: as hard as dirt, but breaking one takes its neighbours of the same kind with it. 0 if the block is none of them. */
@@ -273,16 +278,25 @@ final class HitService {
 		Vec3d end = eye.add(dir.multiply(80));
 		BlockHitResult block = client.world.raycast(new RaycastContext(eye, end, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, p));
 		if (block.getType() != HitResult.Type.MISS) end = block.getPos();
+		boolean blockHit = block.getType() != HitResult.Type.MISS;
 		Entity best = null;
 		Vec3d bestPoint = end;
 		double bestDist = Double.MAX_VALUE;
+		// everything the line meets, nearest first: a piercing shot (level 3) goes through them all
+		List<Entity> onLine = new ArrayList<>();
+		java.util.Map<Entity, Double> lineDist = new java.util.HashMap<>();
 		for (Entity e : client.world.getOtherEntities(p, new Box(eye, end).expand(1.0), HitService::isTarget)) {
 			java.util.Optional<Vec3d> point = e.getBoundingBox().expand(0.3).raycast(eye, end);
 			if (point.isEmpty()) continue;
 			double d = eye.squaredDistanceTo(point.get());
+			onLine.add(e);
+			lineDist.put(e, d);
 			if (d < bestDist) { bestDist = d; best = e; bestPoint = point.get(); }
 		}
-		Vec3d tip = best != null ? bestPoint : end;
+		onLine.sort(java.util.Comparator.comparingDouble(lineDist::get));
+		boolean pierce = RubyLevel.piercingShots();
+		// where the shot stops: the first enemy, or (piercing) the wall or the far end
+		Vec3d tip = best != null && !pierce ? bestPoint : end;
 		double len = tip.distanceTo(eye);
 		for (double s = 0.8; s < len; s += 0.8) {
 			Vec3d at = eye.add(dir.multiply(s));
@@ -291,18 +305,39 @@ final class HitService {
 		// A shot digs into dirt along its line like a light attack: one block deep for the first shot, two, then three.
 		if (breakDepth > 0 && Protection.rubyDigs()) {
 			List<net.minecraft.util.math.BlockPos> dug = new ArrayList<>();
-			double shotLength = Math.min(80.0, best != null ? len : len + breakDepth + 0.5);
+			double shotLength = Math.min(80.0, best != null && !pierce ? len : len + breakDepth + 0.5);
 			drill(client.world, eye, dir, shotLength, shotLength, breakDepth, Integer.MIN_VALUE / 2, dug);
 			int floorY = MathHelper.floor(p.getY() + 0.01);
 			// spare the ground right under Ruby
 			dug.removeIf(pos -> pos.getY() < floorY && Math.hypot(pos.getX() + 0.5 - p.getX(), pos.getZ() + 0.5 - p.getZ()) < 2.0);
 			breakAll(client, p, dug);
 		}
+		List<UUID> struck = new ArrayList<>();
 		if (best != null) {
-			List<UUID> one = new ArrayList<>();
-			one.add(best.getUuid());
-			deliver(client, p, one, dir.multiply(1, 0, 1).normalize(), h);
+			if (pierce) for (Entity e : onLine) { if (struck.size() < 6) struck.add(e.getUuid()); }
+			else struck.add(best.getUuid());
 		}
+		// From level 5 a shot bursts where it lands: it hurts what is near and breaks the softer blocks around the spot.
+		if (RubyLevel.burstShots() && (best != null || blockHit)) {
+			Vec3d at = best != null && !pierce ? bestPoint : (blockHit ? end : bestPoint);
+			client.world.addParticle(ParticleTypes.EXPLOSION, at.x, at.y, at.z, 0, 0, 0);
+			for (Entity e : client.world.getOtherEntities(p, new Box(at, at).expand(2.5), HitService::isTarget)) {
+				if (!struck.contains(e.getUuid()) && e.squaredDistanceTo(at) <= 2.5 * 2.5 && struck.size() < 10) struck.add(e.getUuid());
+			}
+			if (Protection.rubyDigs()) {
+				List<net.minecraft.util.math.BlockPos> around = new ArrayList<>();
+				net.minecraft.util.math.BlockPos c = net.minecraft.util.math.BlockPos.ofFloored(at);
+				int floorY = MathHelper.floor(p.getY() + 0.01);
+				for (int x = -2; x <= 2; x++) for (int y = -2; y <= 2; y++) for (int z = -2; z <= 2; z++) {
+					net.minecraft.util.math.BlockPos pos = c.add(x, y, z);
+					if (x * x + y * y + z * z > 4 || (pos.getY() < floorY && Math.hypot(pos.getX() + 0.5 - p.getX(), pos.getZ() + 0.5 - p.getZ()) < 2.0)) continue;
+					int cost = cost(client.world, pos, client.world.getBlockState(pos));
+					if (cost >= 1 && cost <= 2) around.add(pos);
+				}
+				breakAll(client, p, around);
+			}
+		}
+		if (!struck.isEmpty()) deliver(client, p, struck, dir.multiply(1, 0, 1).normalize(), h);
 	}
 
 	/** The first thing the camera's centre line meets (an enemy or a block), or a far point if it meets nothing. */
@@ -331,11 +366,28 @@ final class HitService {
 		deliver(client, p, one, new Vec3d(-MathHelper.sin(yaw), 0, MathHelper.cos(yaw)), h);
 	}
 
+	/** Hits the target and every enemy within `radius` blocks of it (Reap from level 9). */
+	static void strikeArea(MinecraftClient client, CombatController combat, Entity target, CombatData.Hit h, double radius) {
+		PlayerEntity p = client.player;
+		if (p == null || target == null || h == null || client.world == null) return;
+		float yaw = combat.facingYaw() * MathHelper.RADIANS_PER_DEGREE;
+		List<UUID> all = new ArrayList<>();
+		all.add(target.getUuid());
+		for (Entity e : client.world.getOtherEntities(p, target.getBoundingBox().expand(radius), HitService::isTarget)) {
+			if (e != target && e.distanceTo(target) <= radius + e.getWidth() / 2.0) all.add(e.getUuid());
+		}
+		deliver(client, p, all, new Vec3d(-MathHelper.sin(yaw), 0, MathHelper.cos(yaw)), h);
+	}
+
 	private static void deliver(MinecraftClient client, PlayerEntity p, List<UUID> targets, Vec3d fwd, CombatData.Hit h) {
+		deliver(client, p, targets, fwd, h, 1f);
+	}
+
+	private static void deliver(MinecraftClient client, PlayerEntity p, List<UUID> targets, Vec3d fwd, CombatData.Hit h, float damageScale) {
 		if (targets.isEmpty()) return;
 		MinecraftServer server = client.getServer();
 		if (server == null) return; // not single player: nothing to hit with
-		float damage = h.damage * GrimmMcClient.CONFIG.damageScale;
+		float damage = h.damage * GrimmMcClient.CONFIG.damageScale * damageScale;
 		UUID playerId = p.getUuid();
 		RegistryKey<World> dim = client.world.getRegistryKey();
 		Vec3d origin = p.getPos();

@@ -13,14 +13,14 @@ final class RubyStats {
 	private RubyStats() {}
 
 	/** Grimm Eclipse's aura is 4,000; three times that (config aura_max) suits Minecraft's steadier incoming damage. */
-	static float maxShield() { return GrimmMcClient.CONFIG.auraMax; }
+	static float maxShield() { return GrimmMcClient.CONFIG.auraMax * RubyLevel.auraMultiplier(); }
 	static final float MAX_HEALTH = 1000f;
 	/** Minecraft damage to aura points: the full aura is worth a full row of hearts (20 health). */
 	static final float SHIELD_PER_DAMAGE = 4000f / 20f;
 	/** Grimm Eclipse refills the aura in 2 s; in Minecraft that felt too fast, so the default is three times slower (config aura_recharge_seconds). */
 	static final float RECHARGE_DELAY = 3f, DEPLETED_DELAY = 5f;
-	static float rechargeSeconds() { return GrimmMcClient.CONFIG.auraRechargeSeconds; }
-	static final int HITS_PER_SPECIAL = 24;
+	static float rechargeSeconds() { return GrimmMcClient.CONFIG.auraRechargeSeconds * RubyLevel.auraRechargeFactor(); }
+	static int hitsPerSpecial() { return RubyLevel.hitsPerSpecial(); }
 
 	private static float shield = GrimmMcClient.CONFIG.auraMax;
 	private static boolean depleted, recharging;
@@ -62,8 +62,8 @@ final class RubyStats {
 	/** Landed hits fill the special meter. */
 	static synchronized void addHits(int n) {
 		hits += n;
-		while (hits >= HITS_PER_SPECIAL) {
-			hits -= HITS_PER_SPECIAL;
+		while (hits >= hitsPerSpecial()) {
+			hits -= hitsPerSpecial();
 			specialReady = true;
 		}
 	}
@@ -82,7 +82,7 @@ final class RubyStats {
 
 	static synchronized float shield() { return shield; }
 
-	static synchronized float specialFill() { return specialReady ? 1f : hits / (float) HITS_PER_SPECIAL; }
+	static synchronized float specialFill() { return specialReady ? 1f : hits / (float) hitsPerSpecial(); }
 
 	static synchronized boolean specialReady() { return specialReady; }
 
@@ -100,12 +100,18 @@ final class RubyStats {
 		bar(ctx, client, x, y + 11, "Health", health / MAX_HEALTH, 0xFFE0453F, 0xFF7A1F1C, Math.round(health));
 		bar(ctx, client, x, y + 22, "Special", specialFill(), specialReady() ? 0xFFFFD34D : 0xFFC05A87, 0xFF5A2840,
 			specialReady() ? 1 : 0);
+		// Ruby's level: progress toward the next one
+		int rubyLevel = RubyLevel.level();
+		ctx.fill(x - 1, y + 32, x + W + 1, y + 37, 0xAA000000);
+		ctx.fill(x, y + 33, x + W, y + 36, 0xFF3A2F52);
+		ctx.fill(x, y + 33, x + Math.round(W * RubyLevel.progress()), y + 36, 0xFFB48CFF);
+		ctx.drawText(client.textRenderer, "Level " + rubyLevel + (rubyLevel >= RubyLevel.MAX ? " (max)" : ""), x + W + 6, y + 32, 0xFFFFFFFF, true);
 		int combo = Momentum.hits();
 		if (combo > 0) {
 			int level = Momentum.level();
-			ctx.fill(x - 1, y + 32, x + W + 1, y + 36, 0xAA000000);
-			ctx.fill(x, y + 33, x + Math.round(W * Momentum.remaining()), y + 35, level > 0 ? 0xFFFFA23B : 0xFF9AA5B1);
-			ctx.drawText(client.textRenderer, "Combo " + combo + (level > 0 ? "  Power " + level : ""), x, y + 38, level > 0 ? 0xFFFFD34D : 0xFFFFFFFF, true);
+			ctx.fill(x - 1, y + 43, x + W + 1, y + 47, 0xAA000000);
+			ctx.fill(x, y + 44, x + Math.round(W * Momentum.remaining()), y + 46, level > 0 ? 0xFFFFA23B : 0xFF9AA5B1);
+			ctx.drawText(client.textRenderer, "Combo " + combo + (level > 0 ? "  Power " + level : ""), x, y + 49, level > 0 ? 0xFFFFD34D : 0xFFFFFFFF, true);
 		}
 	}
 

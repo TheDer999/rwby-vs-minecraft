@@ -61,8 +61,12 @@ enum GrimmKind {
 
 	/** Experience a Grimm of this kind and size gives: 3, 9 or 27 points for a small, medium or large Beowolf (a vanilla zombie gives 5, a blaze 10), four times that for a mutant. */
 	int experience(int size) {
-		float xp = 3f * (float) Math.pow(3, size) * xpFactor() * (mutant() ? 4f : 1f) * GrimmMcClient.CONFIG.grimmXp;
-		return GrimmMcClient.CONFIG.grimmXp > 0 ? Math.max(1, Math.round(xp)) : 0;
+		return GrimmMcClient.CONFIG.grimmXp > 0 ? Math.max(1, Math.round(baseExperience(size) * GrimmMcClient.CONFIG.grimmXp)) : 0;
+	}
+
+	/** The same points without the grimm_xp setting: what a kill is worth toward Ruby's level. */
+	int baseExperience(int size) {
+		return Math.max(1, Math.round(3f * (float) Math.pow(3, size) * xpFactor() * (mutant() ? 4f : 1f)));
 	}
 
 	boolean mutant() {

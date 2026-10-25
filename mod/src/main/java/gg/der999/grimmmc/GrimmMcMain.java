@@ -44,6 +44,12 @@ public class GrimmMcMain implements ModInitializer {
 			}
 		}
 		net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents.END_WORLD_TICK.register(GrimmMcMain::spawnTick);
+		// A Grimm the player kills, as Ruby or as Steve, earns points toward Ruby's level.
+		net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> {
+			if (entity instanceof GrimmEntity grimm && source.getAttacker() instanceof net.minecraft.server.network.ServerPlayerEntity player) {
+				RubyLevel.award(player, RubyLevel.pointsFor(grimm));
+			}
+		});
 	}
 
 	/**

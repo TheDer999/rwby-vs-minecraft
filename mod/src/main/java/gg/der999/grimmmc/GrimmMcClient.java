@@ -171,6 +171,7 @@ public class GrimmMcClient implements ClientModInitializer {
 				else if (AUTO_MODE.equals("grimmfight")) autoGrimmFight(client);
 				else if (AUTO_MODE.equals("grimmkill")) autoGrimmKill(client);
 				else if (AUTO_MODE.equals("grimmdie")) autoGrimmDie(client);
+				else if (AUTO_MODE.equals("grimmlevel")) autoGrimmLevel(client);
 				else if (AUTO_MODE.equals("grimmspawn")) autoGrimmSpawn(client);
 				else if (AUTO_MODE.equals("placed")) autoStep(client);
 			}
@@ -757,6 +758,35 @@ public class GrimmMcClient implements ClientModInitializer {
 		if (n == 305) client.scheduleStop();
 	}
 
+	/** Grimm self test 7: Ruby shoots a row of Grimm at the level given in GRIMMMC_LEVEL; logs what each lost (piercing and bursting shots). */
+	static void autoGrimmLevel(MinecraftClient client) {
+		autoTicks++;
+		int n = autoTicks;
+		var p = client.player;
+		var net = p.networkHandler;
+		var o = client.options;
+		if (n >= 90 && n < 600) { p.setYaw(0f); p.setPitch(2f); }
+		String lv = System.getenv("GRIMMMC_LEVEL");
+		if (n == 91 && net != null) net.sendChatCommand("grimmmc level set " + (lv == null ? "1" : lv));
+		if (n == 92 && net != null) net.sendChatCommand("gamemode survival");
+		if (n == 93 && net != null) net.sendChatCommand("difficulty normal");
+		if (n == 94 && net != null) net.sendChatCommand("time set noon");
+		if (n == 96 && net != null) {
+			for (int z : new int[] {4, 6, 8, 10}) net.sendChatCommand("summon grimmmc:ursa_large ~ ~ ~" + z + " {NoAI:1b,Health:500f,Attributes:[{id:\"minecraft:max_health\",base:500}]}");
+			net.sendChatCommand("summon grimmmc:ursa_large ~2 ~ ~8 {NoAI:1b,Health:500f,Attributes:[{id:\"minecraft:max_health\",base:500}]}");
+		}
+		if (n == 114) togglePossess(client);
+		if (n == 130 || n == 200) o.dropKey.setPressed(true);
+		if (n == 134 || n == 204) o.dropKey.setPressed(false);
+		if (n == 125 || n == 195 || n == 280) {
+			StringBuilder sb = new StringBuilder();
+			for (net.minecraft.entity.Entity e : client.world.getEntities()) if (e instanceof GrimmEntity g) sb.append(String.format("[z=%.0f x=%.0f hp=%.1f] ", g.getZ() - p.getZ(), g.getX() - p.getX(), g.getHealth()));
+			LOG.info("GRIMM-TEST level {} tick {}: {} rubyLevel={} aura={}", RubyLevel.level(), n, sb, RubyLevel.level(), RubyStats.shield());
+		}
+		if (n == 150 || n == 215) shoot(client);
+		if (n == 285) client.scheduleStop();
+	}
+
 	/** Grimm self test 6: a Grimm dies and fades, with screenshots along the way. */
 	static void autoGrimmDie(MinecraftClient client) {
 		autoTicks++;
@@ -800,8 +830,8 @@ public class GrimmMcClient implements ClientModInitializer {
 		if (n >= 110 && n % 40 == 0 && n <= 840) {
 			int grimm = 0;
 			for (net.minecraft.entity.Entity e : client.world.getEntities()) if (e instanceof GrimmEntity) grimm++;
-			LOG.info("GRIMM-TEST kill tick {}: grimm alive {} playerHp={} xpLevel={} xpProgress={} totalXp={} comboHits={} powerLevel={}",
-				n, grimm, p.getHealth(), p.experienceLevel, p.experienceProgress, p.totalExperience, Momentum.hits(), Momentum.level());
+			LOG.info("GRIMM-TEST kill tick {}: grimm alive {} playerHp={} xpLevel={} xpProgress={} totalXp={} comboHits={} powerLevel={} rubyLevel={} rubyPoints={}",
+				n, grimm, p.getHealth(), p.experienceLevel, p.experienceProgress, p.totalExperience, Momentum.hits(), Momentum.level(), RubyLevel.level(), RubyLevel.points());
 		}
 		if (n == 860) client.scheduleStop();
 	}

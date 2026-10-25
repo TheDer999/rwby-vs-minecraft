@@ -66,6 +66,22 @@ final class Protection {
 						c.getSource().sendFeedback(() -> Text.literal(describe()), false);
 						return 1;
 					}))))
+				.then(CommandManager.literal("level")
+					.executes(c -> {
+						c.getSource().sendFeedback(() -> Text.literal(RubyLevel.describe()), false);
+						return 1;
+					})
+					.then(CommandManager.literal("reset").executes(c -> {
+						int old = RubyLevel.reset();
+						c.getSource().sendFeedback(() -> Text.literal("Ruby started over from level " + old + ". Her unlocks are gone until she levels up again."), false);
+						return 1;
+					}))
+					.then(CommandManager.literal("set").requires(s -> s.hasPermissionLevel(2))
+						.then(CommandManager.argument("level", com.mojang.brigadier.arguments.IntegerArgumentType.integer(1, RubyLevel.MAX)).executes(c -> {
+							RubyLevel.setLevel(com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(c, "level"));
+							c.getSource().sendFeedback(() -> Text.literal(RubyLevel.describe()), false);
+							return 1;
+						}))))
 				.then(CommandManager.literal("mutant").requires(s -> s.hasPermissionLevel(2)).executes(c -> {
 					var player = c.getSource().getPlayerOrThrow();
 					boolean ok = GrimmMcMain.spawnMutant(c.getSource().getWorld(), player, player.getRandom(), true);

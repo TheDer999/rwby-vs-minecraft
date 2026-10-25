@@ -494,7 +494,8 @@ public final class CombatController {
 	void strikeSlot(int slot) {
 		CombatData.Attack atk = move == null ? null : move.ability.attacks[slot];
 		if (atk == null || atk.hit == null || target == null || !target.isAlive()) return;
-		HitService.strike(MinecraftClient.getInstance(), this, target, atk.hit);
+		if (RubyLevel.reapArea() && "Reap".equals(move.ability.coroutine)) HitService.strikeArea(MinecraftClient.getInstance(), this, target, atk.hit, 4.0); // level 9
+		else HitService.strike(MinecraftClient.getInstance(), this, target, atk.hit);
 		Fx.swipe(facingYaw, atk.hit.damage);
 	}
 
@@ -612,9 +613,11 @@ public final class CombatController {
 	void hit(int slot) {
 		CombatData.Attack atk = move == null ? null : move.ability.attacks[slot];
 		MinecraftClient client = MinecraftClient.getInstance();
-		HitService.hit(client, this, atk);
+		// level 10: the Crescendo reaches almost twice as far, hits twice as hard and digs three deep
+		boolean ultimate = RubyLevel.bigCrescendo() && move != null && "Crescendo".equals(move.ability.coroutine);
+		HitService.hit(client, this, atk, ultimate ? 1.8f : 1f, ultimate ? 2f : 1f);
 		// Each attack of a combo digs into dirt along its swing, once per move.
-		int depth = breakDepth();
+		int depth = ultimate ? 3 : breakDepth();
 		if (move != null && "Heavy".equals(move.ability.coroutine) && slot == 1) depth = 2; // the uncharged heavy
 		if (depth > 0 && breakMove != move) {
 			breakMove = move;
