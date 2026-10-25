@@ -23,7 +23,7 @@ final class RubyLevel {
 
 	static final int MAX = 10;
 	/** Total points needed to reach level 2, 3 ... 10. */
-	private static final int[] NEEDED = {30, 70, 120, 190, 280, 400, 560, 760, 1000};
+	private static final int[] NEEDED = {150, 350, 600, 950, 1400, 2000, 2800, 3800, 5000};
 	/** What each level unlocks (index = level - 2), shown when it is reached. */
 	static final String[] UNLOCKS = {
 		"aura +10%",
