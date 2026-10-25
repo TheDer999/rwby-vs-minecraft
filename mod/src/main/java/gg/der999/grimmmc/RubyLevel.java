@@ -110,9 +110,13 @@ final class RubyLevel {
 		return Math.max(0f, Math.min(1f, (points - from) / (float) (to - from)));
 	}
 
-	/** Points a Grimm gives toward Ruby's level (the experience it drops, without the grimm_xp setting). */
+	/**
+	 * Points a Grimm gives toward Ruby's level: the experience it drops without the grimm_xp setting, except that a mutant is worth
+	 * 1.5 times its kind here (it drops 4 times the experience): two large mutants once gave nearly six levels in a night.
+	 */
 	static int pointsFor(GrimmEntity g) {
-		return g.kind().baseExperience(g.size());
+		GrimmKind k = g.kind();
+		return Math.max(1, Math.round(3f * (float) Math.pow(3, g.size()) * k.xpFactor() * (k.mutant() ? 1.5f : 1f)));
 	}
 
 	/** A kill earned points (server thread). */
