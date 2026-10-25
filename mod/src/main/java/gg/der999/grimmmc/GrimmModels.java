@@ -107,7 +107,7 @@ final class GrimmModels {
 	}
 
 	/** Draws one Grimm in the given clip at the given time; the matrix stack is at its feet. */
-	static void draw(GrimmKind kind, int size, String clipName, float time, boolean loop, float bodyYaw, boolean hurt,
+	static void draw(GrimmKind kind, int size, String clipName, float time, boolean loop, float bodyYaw, boolean hurt, float fade,
 			MatrixStack ms, VertexConsumerProvider vcp, int light) {
 		Model m = get(kind);
 		if (m == null) return;
@@ -127,18 +127,32 @@ final class GrimmModels {
 		MatrixStack.Entry entry = ms.peek();
 		Matrix4f mat = entry.getPositionMatrix();
 		int overlay = OverlayTexture.packUv(OverlayTexture.getU(0.0f), OverlayTexture.getV(hurt));
+		// a dying Grimm turns red, then black, and fades away
+		int cr = 255, cg = 255, cb = 255, ca = 255;
+		if (fade >= 0.35f) {
+			if (fade < 0.65f) {
+				float q = (fade - 0.35f) / 0.3f;
+				cg = cb = Math.round(255 - 185 * q);
+				ca = Math.round(255 - 55 * q);
+			} else {
+				float q = (fade - 0.65f) / 0.35f;
+				cr = Math.round(255 - 230 * q);
+				cg = cb = Math.round(70 - 45 * q);
+				ca = Math.round(200 * (1f - q));
+			}
+		}
 		for (int sm = 0; sm < rig.subs.length; sm++) {
 			Identifier tex = m.textures[Math.min(sm, m.textures.length - 1)];
 			if (tex == null) continue;
-			VertexConsumer vc = vcp.getBuffer(RenderLayer.getEntityCutoutNoCull(tex));
-			emit(vc, mat, entry, m.skinned, rig.uvs, rig.indices, rig.subs[sm][0], rig.subs[sm][1], light, overlay);
+			VertexConsumer vc = vcp.getBuffer(ca < 255 ? RenderLayer.getEntityTranslucent(tex) : RenderLayer.getEntityCutoutNoCull(tex));
+			emit(vc, mat, entry, m.skinned, rig.uvs, rig.indices, rig.subs[sm][0], rig.subs[sm][1], light, overlay, cr, cg, cb, ca);
 		}
 		ms.pop();
 	}
 
 	/** Triangles from Unity-space positions (left-handed, Y-up), mirrored on X for Minecraft. */
 	private static void emit(VertexConsumer vc, Matrix4f m, MatrixStack.Entry entry, float[] p, float[] uv, int[] indices,
-			int first, int count, int light, int overlay) {
+			int first, int count, int light, int overlay, int cr, int cg, int cb, int ca) {
 		for (int i = first; i + 2 < first + count; i += 3) {
 			int a = indices[i], b = indices[i + 1], c = indices[i + 2];
 			float ax = -p[a * 3], ay = p[a * 3 + 1], az = p[a * 3 + 2];
@@ -149,15 +163,15 @@ final class GrimmModels {
 			float nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
 			float len = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
 			if (len > 0) { nx /= len; ny /= len; nz /= len; }
-			vert(vc, m, entry, ax, ay, az, uv[a * 2], uv[a * 2 + 1], nx, ny, nz, light, overlay);
-			vert(vc, m, entry, bx, by, bz, uv[b * 2], uv[b * 2 + 1], nx, ny, nz, light, overlay);
-			vert(vc, m, entry, cx, cy, cz, uv[c * 2], uv[c * 2 + 1], nx, ny, nz, light, overlay);
-			vert(vc, m, entry, cx, cy, cz, uv[c * 2], uv[c * 2 + 1], nx, ny, nz, light, overlay); // entity layers draw quads
+			vert(vc, m, entry, ax, ay, az, uv[a * 2], uv[a * 2 + 1], nx, ny, nz, light, overlay, cr, cg, cb, ca);
+			vert(vc, m, entry, bx, by, bz, uv[b * 2], uv[b * 2 + 1], nx, ny, nz, light, overlay, cr, cg, cb, ca);
+			vert(vc, m, entry, cx, cy, cz, uv[c * 2], uv[c * 2 + 1], nx, ny, nz, light, overlay, cr, cg, cb, ca);
+			vert(vc, m, entry, cx, cy, cz, uv[c * 2], uv[c * 2 + 1], nx, ny, nz, light, overlay, cr, cg, cb, ca); // entity layers draw quads
 		}
 	}
 
 	private static void vert(VertexConsumer vc, Matrix4f m, MatrixStack.Entry entry, float x, float y, float z, float u, float v,
-			float nx, float ny, float nz, int light, int overlay) {
-		vc.vertex(m, x, y, z).color(255, 255, 255, 255).texture(u, 1.0f - v).overlay(overlay).light(light).normal(entry, nx, ny, nz);
+			float nx, float ny, float nz, int light, int overlay, int cr, int cg, int cb, int ca) {
+		vc.vertex(m, x, y, z).color(cr, cg, cb, ca).texture(u, 1.0f - v).overlay(overlay).light(light).normal(entry, nx, ny, nz);
 	}
 }

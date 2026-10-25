@@ -35,6 +35,7 @@ final class RubyStats {
 		sinceHit = 99f;
 		hits = 0;
 		specialReady = false;
+		Momentum.reset();
 	}
 
 	/** Damage the aura takes first; returns what is left over for her health (called on the server thread). */
@@ -99,6 +100,13 @@ final class RubyStats {
 		bar(ctx, client, x, y + 11, "Health", health / MAX_HEALTH, 0xFFE0453F, 0xFF7A1F1C, Math.round(health));
 		bar(ctx, client, x, y + 22, "Special", specialFill(), specialReady() ? 0xFFFFD34D : 0xFFC05A87, 0xFF5A2840,
 			specialReady() ? 1 : 0);
+		int combo = Momentum.hits();
+		if (combo > 0) {
+			int level = Momentum.level();
+			ctx.fill(x - 1, y + 32, x + W + 1, y + 36, 0xAA000000);
+			ctx.fill(x, y + 33, x + Math.round(W * Momentum.remaining()), y + 35, level > 0 ? 0xFFFFA23B : 0xFF9AA5B1);
+			ctx.drawText(client.textRenderer, "Combo " + combo + (level > 0 ? "  Power " + level : ""), x, y + 38, level > 0 ? 0xFFFFD34D : 0xFFFFFFFF, true);
+		}
 	}
 
 	private static void bar(DrawContext ctx, MinecraftClient client, int x, int y, String label, float fill, int color, int back, int value) {

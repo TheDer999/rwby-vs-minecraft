@@ -52,12 +52,14 @@ final class GrimmConfig {
 	final float grimmSpawnMultiplier;
 	/** On average one mutant Grimm per this many 3-second checks per player at night (config key mutant_rarity, default 40, about one every 2 minutes; 0 turns them off). */
 	final int mutantRarity;
+	/** Scales the experience a Grimm gives when it dies (config key grimm_xp, default 1; 0 gives none). */
+	final float grimmXp;
 	/** Whether blocks players placed are spared by Ruby and the Grimm (config key spare_placed, default false). */
 	final boolean sparePlaced;
 	/** Enables the developer keys (animation browser, placed Ruby) (config key debug=true). */
 	final boolean debug;
 
-	private GrimmConfig(Path home, Path dataDir, String geDir, Path converter, float damageScale, float knockbackScale, boolean hitAllMobs, float auraMax, float auraRechargeSeconds, boolean geSounds, float soundVolume, float jumpHeight, boolean breakBlocks, boolean grimmBreakBlocks, boolean grimmSpawn, float grimmSpawnMultiplier, int mutantRarity, boolean sparePlaced, boolean debug) {
+	private GrimmConfig(Path home, Path dataDir, String geDir, Path converter, float damageScale, float knockbackScale, boolean hitAllMobs, float auraMax, float auraRechargeSeconds, boolean geSounds, float soundVolume, float jumpHeight, boolean breakBlocks, boolean grimmBreakBlocks, boolean grimmSpawn, float grimmSpawnMultiplier, int mutantRarity, float grimmXp, boolean sparePlaced, boolean debug) {
 		this.home = home;
 		this.dataDir = dataDir;
 		this.geDir = geDir;
@@ -75,6 +77,7 @@ final class GrimmConfig {
 		this.grimmSpawn = grimmSpawn;
 		this.grimmSpawnMultiplier = grimmSpawnMultiplier;
 		this.mutantRarity = mutantRarity;
+		this.grimmXp = grimmXp;
 		this.sparePlaced = sparePlaced;
 		this.debug = debug;
 	}
@@ -128,6 +131,7 @@ final class GrimmConfig {
 			!"false".equalsIgnoreCase(p.getProperty("grimm_spawn", "true").trim()),
 			Math.max(0f, Math.min(5f, number(p, "grimm_spawn_multiplier", 1f))),
 			Math.max(0, Math.round(number(p, "mutant_rarity", 40f))),
+			Math.max(0f, Math.min(10f, number(p, "grimm_xp", 1f))),
 			"true".equalsIgnoreCase(p.getProperty("spare_placed", "false").trim()),
 			"true".equalsIgnoreCase(p.getProperty("debug", "false").trim()));
 	}

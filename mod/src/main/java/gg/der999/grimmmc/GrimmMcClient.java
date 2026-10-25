@@ -169,6 +169,8 @@ public class GrimmMcClient implements ClientModInitializer {
 				else if (AUTO_MODE.equals("grimmview")) autoGrimmView(client);
 				else if (AUTO_MODE.equals("grimmwall")) autoGrimmWall(client);
 				else if (AUTO_MODE.equals("grimmfight")) autoGrimmFight(client);
+				else if (AUTO_MODE.equals("grimmkill")) autoGrimmKill(client);
+				else if (AUTO_MODE.equals("grimmdie")) autoGrimmDie(client);
 				else if (AUTO_MODE.equals("grimmspawn")) autoGrimmSpawn(client);
 				else if (AUTO_MODE.equals("placed")) autoStep(client);
 			}
@@ -753,6 +755,55 @@ public class GrimmMcClient implements ClientModInitializer {
 			LOG.info("GRIMM-TEST fight: playerHp={} sounds started={} failed={} {}", p.getHealth(), Sounds.STARTED.get(), Sounds.FAILED.get(), sb);
 		}
 		if (n == 305) client.scheduleStop();
+	}
+
+	/** Grimm self test 6: a Grimm dies and fades, with screenshots along the way. */
+	static void autoGrimmDie(MinecraftClient client) {
+		autoTicks++;
+		int n = autoTicks;
+		var p = client.player;
+		var net = p.networkHandler;
+		if (n >= 90 && n < 400) { p.setYaw(0f); p.setPitch(6f); }
+		if (n == 92 && net != null) net.sendChatCommand("gamemode creative");
+		if (n == 94 && net != null) net.sendChatCommand("time set noon");
+		if (n == 96 && net != null) net.sendChatCommand("summon grimmmc:beowolf_large ~ ~ ~9 {NoAI:1b,Rotation:[180f,0f]}");
+		if (n == 130 && net != null) net.sendChatCommand("kill @e[type=grimmmc:beowolf_large]");
+		for (int t : new int[] {132, 144, 152, 160, 168, 176, 184}) if (n == t) shoot(client);
+		if (n == 200) client.scheduleStop();
+	}
+
+	/** Grimm self test 5: Ruby kills Grimm that stand still in front of her; logs the experience, the healing and the combo power level. */
+	static void autoGrimmKill(MinecraftClient client) {
+		autoTicks++;
+		int n = autoTicks;
+		var p = client.player;
+		var net = p.networkHandler;
+		var o = client.options;
+		if (n >= 90 && n < 900) { p.setYaw(0f); p.setPitch(5f); }
+		if (n == 92 && net != null) net.sendChatCommand("gamemode survival");
+		if (n == 93 && net != null) net.sendChatCommand("difficulty normal");
+		if (n == 95 && net != null) net.sendChatCommand("time set noon");
+		if (n == 96 && net != null) {
+			net.sendChatCommand("summon grimmmc:beowolf_small ~-1 ~ ~2 {NoAI:1b}");
+			net.sendChatCommand("summon grimmmc:beowolf_small ~1 ~ ~2 {NoAI:1b}");
+			net.sendChatCommand("summon grimmmc:creep_small ~ ~ ~3 {NoAI:1b}");
+			net.sendChatCommand("summon grimmmc:ursa_small ~-2 ~ ~3 {NoAI:1b}");
+			net.sendChatCommand("summon grimmmc:boar_small ~2 ~ ~3 {NoAI:1b}");
+		}
+		if (n == 100 && net != null) net.sendChatCommand("damage @s 10 minecraft:generic");
+		if (n == 114) togglePossess(client);
+		if (n >= 120 && n < 800) {
+			int phase = (n - 120) % 16;
+			if (phase == 0) o.attackKey.setPressed(true);
+			if (phase == 2) o.attackKey.setPressed(false);
+		}
+		if (n >= 110 && n % 40 == 0 && n <= 840) {
+			int grimm = 0;
+			for (net.minecraft.entity.Entity e : client.world.getEntities()) if (e instanceof GrimmEntity) grimm++;
+			LOG.info("GRIMM-TEST kill tick {}: grimm alive {} playerHp={} xpLevel={} xpProgress={} totalXp={} comboHits={} powerLevel={}",
+				n, grimm, p.getHealth(), p.experienceLevel, p.experienceProgress, p.totalExperience, Momentum.hits(), Momentum.level());
+		}
+		if (n == 860) client.scheduleStop();
 	}
 
 	/** Grimm self test 4: how many Grimm have appeared around a waiting player after some seconds of day and of night. */

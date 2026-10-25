@@ -18,6 +18,8 @@ import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.mob.HostileEntity;
 import net.minecraft.entity.passive.MerchantEntity;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.particle.DustParticleEffect;
+import net.minecraft.particle.ParticleTypes;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
@@ -48,7 +50,7 @@ public class GrimmEntity extends HostileEntity {
 		super(type, world);
 		this.kind = kind;
 		this.size = size;
-		this.experiencePoints = 5 + size * 5;
+		this.experiencePoints = kind.experience(size);
 	}
 
 	@Override
@@ -111,10 +113,26 @@ public class GrimmEntity extends HostileEntity {
 	@Override
 	protected void updatePostDeath() {
 		deathTime++;
-		if (deathTime >= (int) (kind.deathSeconds() * 20f) + 8 && !getWorld().isClient() && !isRemoved()) {
-			getWorld().sendEntityStatus(this, (byte) 60);
-			remove(RemovalReason.KILLED);
+		if (getWorld() instanceof ServerWorld world && !isRemoved()) {
+			mist(world);
+			if (deathTime >= deathTicks()) remove(RemovalReason.KILLED);
 		}
+	}
+
+	/** How many ticks a dying Grimm lasts: its Death animation and a moment more to fade away. */
+	int deathTicks() {
+		return (int) (kind.deathSeconds() * 20f) + 8;
+	}
+
+	/** A Grimm does not leave a body: it turns red, then black, and dissolves in a mist of the same colours (the model fades in GrimmRenderer). */
+	private void mist(ServerWorld world) {
+		float f = deathTime / (float) deathTicks();
+		if (f < 0.35f) return;
+		boolean red = f < 0.65f;
+		int count = 3 + size * 3 + (kind.mutant() ? 4 : 0);
+		double w = getWidth() * 0.4, h = getHeight() * 0.4;
+		world.spawnParticles(new DustParticleEffect(red ? 0xB01010 : 0x151515, 1.5f + size * 0.4f), getX(), getY() + getHeight() * 0.5, getZ(), count, w, h, w, 0.02);
+		if (!red && deathTime % 2 == 0) world.spawnParticles(ParticleTypes.LARGE_SMOKE, getX(), getY() + getHeight() * 0.4, getZ(), 1 + size, w, h, w, 0.01);
 	}
 
 	// ---- attacking and digging (server side)

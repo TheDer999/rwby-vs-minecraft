@@ -341,6 +341,7 @@ final class HitService {
 		Vec3d origin = p.getPos();
 		GrimmMcClient.hitsLanded += targets.size();
 		RubyStats.addHits(targets.size());
+		Momentum.hit(1); // one per attack that connects, however many it hits
 		server.execute(() -> apply(server, dim, playerId, targets, origin, fwd, damage, h));
 	}
 
@@ -349,11 +350,17 @@ final class HitService {
 		ServerWorld world = server.getWorld(dim);
 		ServerPlayerEntity player = server.getPlayerManager().getPlayer(playerId);
 		if (world == null || player == null) return;
+		int level = Momentum.level();
+		damage *= Momentum.damageMultiplier(level); // the combo's power level makes every hit stronger
 		for (UUID id : targets) {
 			Entity e = world.getEntity(id);
 			if (!(e instanceof LivingEntity target) || !target.isAlive()) continue;
 			target.timeUntilRegen = 0; // Grimm Eclipse has no hit immunity between hits
 			target.damage(world, world.getDamageSources().playerAttack(player), Math.max(damage, 0.01f));
+			if (!target.isAlive()) { // a kill gives health back, more at higher power levels
+				player.heal(Momentum.healFor(target, level));
+				world.spawnParticles(ParticleTypes.HEART, player.getX(), player.getBodyY(0.9), player.getZ(), 3, 0.3, 0.3, 0.3, 0.0);
+			}
 
 			// Knockback: Grimm Eclipse pushes for hitTime seconds at knockBack units per second. Negative pulls the target in.
 			Vec3d away = new Vec3d(target.getX() - origin.x, 0, target.getZ() - origin.z);
@@ -376,6 +383,7 @@ final class HitService {
 			world.spawnParticles(h.damage >= 100f ? ParticleTypes.CRIT : ParticleTypes.ENCHANTED_HIT,
 				target.getX(), target.getBodyY(0.6), target.getZ(), h.damage >= 100f ? 12 : 4, 0.25, 0.25, 0.25, 0.1);
 		}
+		Momentum.applyEffects(player, level);
 		world.playSound(null, player.getBlockPos(),
 			damage >= 1f ? SoundEvents.ENTITY_PLAYER_ATTACK_STRONG : SoundEvents.ENTITY_PLAYER_ATTACK_SWEEP,
 			SoundCategory.PLAYERS, 0.8f, 1.0f);

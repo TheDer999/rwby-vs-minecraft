@@ -49,6 +49,22 @@ enum GrimmKind {
 		new double[] {100, 220, 450}, new double[] {5, 9, 15}, new double[] {0.30, 0.30, 0.30}, new int[] {4, 6, 9},
 		new float[] {0.22f, 0.34f, 0.55f});
 
+	/** Experience of a small Grimm of this kind before the size and mutant multipliers: a large Beowolf is worth about 3 levels. */
+	float xpFactor() {
+		return switch (this) {
+			case CREEP -> 0.8f;
+			case URSA -> 1.5f;
+			case DEATHSTALKER -> 1.3f;
+			default -> 1.0f;
+		};
+	}
+
+	/** Experience a Grimm of this kind and size gives: 3, 9 or 27 points for a small, medium or large Beowolf (a vanilla zombie gives 5, a blaze 10), four times that for a mutant. */
+	int experience(int size) {
+		float xp = 3f * (float) Math.pow(3, size) * xpFactor() * (mutant() ? 4f : 1f) * GrimmMcClient.CONFIG.grimmXp;
+		return GrimmMcClient.CONFIG.grimmXp > 0 ? Math.max(1, Math.round(xp)) : 0;
+	}
+
 	boolean mutant() {
 		return this == MUTANT_BEOWOLF || this == MUTANT_CREEP || this == MUTANT_DEATHSTALKER;
 	}

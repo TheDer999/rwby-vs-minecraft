@@ -17,6 +17,8 @@ public class GrimmRenderer extends EntityRenderer<GrimmEntity, GrimmRenderer.Sta
 		boolean loop = true;
 		float bodyYaw;
 		boolean hurt;
+		/** How far a dying Grimm has faded (0 to 1), or -1 while it lives. */
+		float fade = -1f;
 	}
 
 	public GrimmRenderer(EntityRendererFactory.Context ctx) {
@@ -35,7 +37,8 @@ public class GrimmRenderer extends EntityRenderer<GrimmEntity, GrimmRenderer.Sta
 		s.kind = e.kind();
 		s.size = e.size();
 		s.bodyYaw = MathHelper.lerpAngleDegrees(delta, e.prevBodyYaw, e.bodyYaw);
-		s.hurt = e.hurtTime > 0 || e.deathTime > 0;
+		s.hurt = e.hurtTime > 0 && !e.isDead();
+		s.fade = e.isDead() ? Math.min(1f, (e.deathTime + delta) / e.deathTicks()) : -1f;
 		GrimmKind k = e.kind();
 		int attack = e.attackTicks();
 		double speed = e.getVelocity().horizontalLength();
@@ -69,7 +72,7 @@ public class GrimmRenderer extends EntityRenderer<GrimmEntity, GrimmRenderer.Sta
 	@Override
 	public void render(State s, MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light) {
 		try {
-			GrimmModels.draw(s.kind, s.size, s.clip, s.time, s.loop, s.bodyYaw, s.hurt, matrices, vertexConsumers, light);
+			GrimmModels.draw(s.kind, s.size, s.clip, s.time, s.loop, s.bodyYaw, s.hurt, s.fade, matrices, vertexConsumers, light);
 		} catch (Exception e) {
 			if (!failed) {
 				failed = true;
