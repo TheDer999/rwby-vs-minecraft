@@ -42,6 +42,8 @@ final class Rig {
 	float[] skinW;       // V*4
 	float[][] bindPoses; // 16 each
 	int[] meshBones;     // mesh bone -> node index
+	/** Optional transform above the skeleton root (a rotation a model's prefab carries), row-major, or null. */
+	float[] rootMatrix;
 	Node[] nodes;
 	Clip[] clips;
 
@@ -68,6 +70,7 @@ final class Rig {
 					case "skinW" -> rig.skinW = readFloats(in);
 					case "bindPoses" -> rig.bindPoses = readFloatRows(in);
 					case "meshBones" -> rig.meshBones = readInts(in);
+					case "root" -> rig.rootMatrix = readFloats(in);
 					case "nodes" -> rig.nodes = readNodes(in);
 					case "clips" -> rig.clips = readClips(in, rig.nodes.length);
 					default -> in.skipValue();
@@ -330,8 +333,10 @@ final class Rig {
 			local[8] = 2 * (x * z - y * w) * s[0]; local[9] = 2 * (y * z + x * w) * s[1]; local[10] = (1 - 2 * (x * x + y * y)) * s[2]; local[11] = p[2];
 			local[12] = 0; local[13] = 0; local[14] = 0; local[15] = 1;
 			int parent = nodes[i].parent;
-			if (parent < 0) System.arraycopy(local, 0, world[i], 0, 16);
-			else mul(world[parent], local, world[i]);
+			if (parent < 0) {
+				if (rootMatrix == null) System.arraycopy(local, 0, world[i], 0, 16);
+				else mul(rootMatrix, local, world[i]);
+			} else mul(world[parent], local, world[i]);
 		}
 	}
 

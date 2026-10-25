@@ -34,7 +34,7 @@ static class Program
         ["deathstalker"] = new CharacterSpec("deathstalker", "Death_Mesh", "Death_Root", Array.Empty<string>(), "Death", "Deathstalker Body"),
         // The mutant Grimm: the same skeletons with their own models and textures.
         ["mutant_beowolf"] = new CharacterSpec("mutant_beowolf", "bodyMesh", "Bip001", Array.Empty<string>(), "BeowolfMutant", "beowolfMutant_01", null,
-            new[] { "Idle", "Walk", "Run", "Death", "Roar", "HitLand01", "HitAir01", "GroundPound", "Frenzy", "UppercutLeft", "UppercutRight", "DashAttack", "Smashed", "Land" }),
+            new[] { "Idle", "Walk", "Run", "Death", "Roar", "HitLand01", "HitAir01", "GroundPound", "Frenzy", "UppercutLeft", "UppercutRight", "DashAttack", "Smashed", "Land" }, true),
         ["mutant_creep"] = new CharacterSpec("mutant_creep", "Creep Mesh", "MuCreepRoot", Array.Empty<string>(), "CreepMutant", "creepMutant_01"),
         ["mutant_deathstalker"] = new CharacterSpec("mutant_deathstalker", "MutantDeath Mesh", "Death_Root", Array.Empty<string>(), "DeathMutant", "deathstalkerMutant_01"),
     };

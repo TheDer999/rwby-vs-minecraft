@@ -6,7 +6,7 @@ using AssetsTools.NET.Extra;
 namespace GrimmConvert;
 
 /// <summary>What to extract for one playable character. Names, not asset ids, so another build still resolves.</summary>
-sealed record CharacterSpec(string Id, string BodyMesh, string SkeletonRoot, string[] PropMeshes, string ScriptClass, string TextureContains = null, string TextureExcludes = null, string[] ClipFilter = null);
+sealed record CharacterSpec(string Id, string BodyMesh, string SkeletonRoot, string[] PropMeshes, string ScriptClass, string TextureContains = null, string TextureExcludes = null, string[] ClipFilter = null, bool UseRoot = false);
 
 /// <summary>Everything read from one Unity Mesh object.</summary>
 sealed class MeshData
@@ -123,6 +123,64 @@ static class Exporters
         (AssetsFileInstance inst, AssetFileInfo info) BodyTexture,
         List<(AssetsFileInstance inst, AssetFileInfo info)?> MaterialTextures);
 
+    /// <summary>
+    /// The combined local transform of everything above a skeleton root in the model's prefab (an import often leaves a rotation or scale
+    /// there), as a row-major matrix, or null when it is the identity. Starts at the transform `from` and climbs; when `stopAt` is given the
+    /// climb first goes up to the object of that name, otherwise `from` is the root itself.
+    /// </summary>
+    static float[] AncestorMatrix(UnityAssets ua, AssetExternal from, Action<string> log, string id, string stopAt = null)
+    {
+        var chain = new List<AssetExternal>();
+        var cur = from;
+        bool reached = stopAt == null;
+        int guard = 0;
+        while (cur.info != null && guard++ < 64)
+        {
+            var bf = ua.Base(cur.file, cur.info);
+            var go = ua.Resolve(cur.file, bf["m_GameObject"]);
+            string name = go.info == null ? "?" : ua.Base(go.file, go.info)["m_Name"].AsString;
+            if (reached) chain.Add(cur);
+            else if (name == stopAt) reached = true;
+            var father = ua.Resolve(cur.file, bf["m_Father"]);
+            if (father.info == null) break;
+            cur = father;
+        }
+        // chain[0] is the root itself (or the first ancestor above stopAt); we want the transforms strictly above the root
+        var above = stopAt == null ? chain.Skip(1).ToList() : chain.ToList();
+        float[] world = Identity();
+        foreach (var t in above.AsEnumerable().Reverse())
+        {
+            var bf = ua.Base(t.file, t.info);
+            var q = bf["m_LocalRotation"]; var pos = bf["m_LocalPosition"]; var sc = bf["m_LocalScale"];
+            var m = Trs(pos["x"].AsFloat, pos["y"].AsFloat, pos["z"].AsFloat, q["x"].AsFloat, q["y"].AsFloat, q["z"].AsFloat, q["w"].AsFloat, sc["x"].AsFloat, sc["y"].AsFloat, sc["z"].AsFloat);
+            world = Mul(world, m);
+        }
+        bool identity = true;
+        var id4 = Identity();
+        for (int i = 0; i < 16; i++) if (Math.Abs(world[i] - id4[i]) > 1e-4f) identity = false;
+        log($"{id}: {above.Count} ancestor transform(s) above the skeleton root, {(identity ? "identity" : "matrix " + string.Join(",", world.Select(v => v.ToString("0.###", Inv))))}");
+        return identity ? null : world;
+    }
+
+    static float[] Identity() => new float[] { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
+
+    static float[] Mul(float[] a, float[] b)
+    {
+        var o = new float[16];
+        for (int r = 0; r < 4; r++)
+            for (int c = 0; c < 4; c++)
+                o[r * 4 + c] = a[r * 4] * b[c] + a[r * 4 + 1] * b[4 + c] + a[r * 4 + 2] * b[8 + c] + a[r * 4 + 3] * b[12 + c];
+        return o;
+    }
+
+    static float[] Trs(float px, float py, float pz, float x, float y, float z, float w, float sx, float sy, float sz) => new float[]
+    {
+        (1 - 2 * (y * y + z * z)) * sx, 2 * (x * y - z * w) * sy, 2 * (x * z + y * w) * sz, px,
+        2 * (x * y + z * w) * sx, (1 - 2 * (x * x + z * z)) * sy, 2 * (y * z - x * w) * sz, py,
+        2 * (x * z - y * w) * sx, 2 * (y * z + x * w) * sy, (1 - 2 * (x * x + y * y)) * sz, pz,
+        0, 0, 0, 1,
+    };
+
     public static RigResult ExportRig(UnityAssets ua, CharacterSpec spec, string outFile, Action<string> log)
     {
         // 1. The SkinnedMeshRenderer that draws the body mesh.
@@ -173,12 +231,21 @@ static class Exporters
         // 3. Names of the bones the mesh binds to, via the renderer's transforms.
         var sbf = ua.Base(smrInst, smrInfo);
         var boneNames = new List<string>();
+        float[] rootMatrix = null;
         foreach (var bp in sbf["m_Bones"]["Array"].Children)
         {
             var tr = ua.Resolve(smrInst, bp);
             var trbf = ua.Base(tr.file, tr.info);
             var go = ua.Resolve(tr.file, trbf["m_GameObject"]);
-            boneNames.Add(ua.Base(go.file, go.info)["m_Name"].AsString);
+            var goName = ua.Base(go.file, go.info)["m_Name"].AsString;
+            boneNames.Add(goName);
+            if (rootMatrix == null && goName == spec.SkeletonRoot) rootMatrix = AncestorMatrix(ua, tr, log, spec.Id);
+        }
+        if (rootMatrix == null)
+        {
+            // The skeleton root is not itself bound to the mesh: climb from the first bone up to it.
+            var first = ua.Resolve(smrInst, sbf["m_Bones"]["Array"].Children.First());
+            rootMatrix = AncestorMatrix(ua, first, log, spec.Id, spec.SkeletonRoot);
         }
 
         // 4. The body texture is the first material's _MainTex.
@@ -250,6 +317,8 @@ static class Exporters
         sb.Append("\"skinW\":[" + string.Join(",", skin.SelectMany(s => Enumerable.Range(0, 4).Select(i => F(s["weight[" + i + "]"].AsFloat)))) + "],\n");
         sb.Append("\"bindPoses\":[" + string.Join(",", bind.Select(m => "[" + string.Join(",", m.Select(F)) + "]")) + "],\n");
         sb.Append("\"meshBones\":[" + string.Join(",", meshBones) + "],\n");
+        // Only models whose prefab stands the skeleton upright with a rotation above it (the mutant Beowolf, turned 90 degrees) need it.
+        if (rootMatrix != null && spec.UseRoot) { rootMatrix[3] = 0; rootMatrix[7] = 0; rootMatrix[11] = 0; sb.Append("\"root\":[" + string.Join(",", rootMatrix.Select(F)) + "],\n"); }
         sb.Append("\"nodes\":[\n" + string.Join(",\n", nodes.Select(p =>
         {
             var parentPath = p.Contains('/') ? p.Substring(0, p.LastIndexOf('/')) : null;

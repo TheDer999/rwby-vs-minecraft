@@ -687,28 +687,23 @@ public class GrimmMcClient implements ClientModInitializer {
 		int n = autoTicks;
 		var p = client.player;
 		var net = p.networkHandler;
-		if (n >= 90 && n < 400) { p.setYaw(0f); p.setPitch(8f); }
+		if (n >= 90 && n < 400) { p.setYaw(0f); p.setPitch(6f); }
 		if (n == 92 && net != null) net.sendChatCommand("gamemode creative");
 		if (n == 94 && net != null) net.sendChatCommand("time set noon");
 		if (n == 96 && net != null) {
-			String[] kinds = {"mutant_beowolf_small", "mutant_creep_small", "mutant_deathstalker_small"};
-			double[] bx = {-5, -0.5, 4.5};
-			for (int i = 0; i < 3; i++) net.sendChatCommand("summon grimmmc:" + kinds[i] + " ~" + bx[i] + " ~ ~10 {NoAI:1b,Rotation:[180f,0f]}");
-			String[] creeps = {"mutant_beowolf_large", "mutant_creep_large", "mutant_deathstalker_large"};
-			double[] cx = {-3.5, 0, 3.5};
-			for (int i = 0; i < 3; i++) net.sendChatCommand("summon grimmmc:" + creeps[i] + " ~" + cx[i] + " ~ ~5 {NoAI:1b,Rotation:[180f,0f]}");
+			net.sendChatCommand("summon grimmmc:mutant_beowolf_medium ~-3 ~ ~9 {NoAI:1b,Rotation:[180f,0f]}");
+			net.sendChatCommand("summon grimmmc:mutant_beowolf_large ~7 ~ ~14 {NoAI:1b,Rotation:[180f,0f]}");
+			net.sendChatCommand("summon grimmmc:beowolf_medium ~-9 ~ ~10 {NoAI:1b,Rotation:[180f,0f]}");
 		}
-		if (n == 125) { try { GrimmModels.logBounds("ruby", Rig.load(CONFIG.dataDir.resolve("ruby_rig.json"))); } catch (Exception e) { LOG.warn("ruby bounds failed", e); } }
-		if (n == 130) {
-			int count = 0;
-			for (net.minecraft.entity.Entity e : client.world.getEntities()) if (e instanceof GrimmEntity) count++;
-			LOG.info("GRIMM-TEST {} Grimm in the world, render error: {}", count, renderError);
-		}
-		if (n == 150) shoot(client);
-		if (n == 160 && net != null) net.sendChatCommand("data merge entity @e[type=grimmmc:beowolf_medium,limit=1] {NoAI:0b}");
-		if (n == 170) client.scheduleStop();
+		if (n == 130) shoot(client);
+		if (n == 135 && net != null) net.sendChatCommand("data merge entity @e[type=grimmmc:mutant_beowolf_medium,limit=1] {NoAI:0b}");
+		if (n == 136 && net != null) net.sendChatCommand("gamemode survival");
+		if (n == 137 && net != null) net.sendChatCommand("effect give @s minecraft:resistance 900 4 true");
+		if (n == 175) shoot(client);
+		if (n == 215) shoot(client);
+		if (n == 260) shoot(client);
+		if (n == 270) client.scheduleStop();
 	}
-
 	static int wallBefore;
 
 	/** Grimm self test 2: a medium Beowolf hunts the player through a stone wall; does it dig? */
@@ -774,14 +769,14 @@ public class GrimmMcClient implements ClientModInitializer {
 		var conn = p.networkHandler;
 		if (n == 92 && conn != null) conn.sendChatCommand("gamemode survival");
 		if (n == 93 && conn != null) conn.sendChatCommand("difficulty normal");
-		if (n == 94 && conn != null) conn.sendChatCommand("effect give @s minecraft:resistance 900 4 true");
-		if (n == 95 && conn != null) conn.sendChatCommand("time set 1000");
-		if (n == 96 && conn != null) conn.sendChatCommand("gamerule doDaylightCycle false");
-		if (n == 700 || n == 1700) logSpawned(client, n == 700 ? "day, after 30 s" : "night, after 50 s");
-		if (n == 710 && conn != null) conn.sendChatCommand("time set 15000");
-		if (n == 1750) client.scheduleStop();
+		if (n == 94 && conn != null) conn.sendChatCommand("effect give @s minecraft:resistance 9999 4 true");
+		if (n == 95 && conn != null) conn.sendChatCommand("gamerule doDaylightCycle false");
+		if (n == 96 && conn != null) conn.sendChatCommand("time set 14000");
+		if (n == 100 && conn != null) conn.sendChatCommand("tick rate 100");
+		// 15,000 game ticks (12 game minutes) at 100 ticks per second
+		if (n == 5000 || n == 10000 || n == 15000) logSpawned(client, "night, " + (n / 1250) + " game minutes");
+		if (n == 15100) client.scheduleStop();
 	}
-
 	static void logSpawned(MinecraftClient client, String label) {
 		java.util.Map<String, Integer> m = new java.util.TreeMap<>();
 		for (net.minecraft.entity.Entity e : client.world.getEntities()) if (e instanceof GrimmEntity g) m.merge(g.getType().getUntranslatedName(), 1, Integer::sum);

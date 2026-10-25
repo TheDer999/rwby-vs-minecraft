@@ -72,6 +72,7 @@ public class GrimmMcMain implements ModInitializer {
 			if (!world.isSpaceEmpty(g)) { g.discard(); continue; }
 			g.initialize(world, world.getLocalDifficulty(pos), net.minecraft.entity.SpawnReason.NATURAL, null);
 			world.spawnEntityAndPassengers(g);
+			if (GrimmMcClient.AUTO) GrimmMcClient.LOG.info("GRIMM-TEST a mutant spawned: {} at {} blocks from the player", kind.entityName(size), (int) Math.sqrt(g.squaredDistanceTo(player)));
 			return;
 		}
 	}

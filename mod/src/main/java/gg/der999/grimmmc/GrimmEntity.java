@@ -215,7 +215,7 @@ public class GrimmEntity extends HostileEntity {
 	static final class PreyGoal extends ActiveTargetGoal<PlayerEntity> {
 		PreyGoal(GrimmEntity g) {
 			super(g, PlayerEntity.class, 10, false, false, null);
-			this.targetPredicate.ignoreVisibility();
+			this.targetPredicate.ignoreVisibility().ignoreDistanceScalingFactor(); // Ruby is invisible while played: do not shrink the range
 		}
 	}
 
