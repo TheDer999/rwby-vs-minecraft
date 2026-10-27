@@ -300,7 +300,7 @@ final class HitService {
 		double len = tip.distanceTo(eye);
 		for (double s = 0.8; s < len; s += 0.8) {
 			Vec3d at = eye.add(dir.multiply(s));
-			client.world.addParticle(ParticleTypes.CRIT, at.x, at.y, at.z, 0, 0, 0);
+			Glow.spark(at, 0, 0, 0, 10, 0.07f);
 		}
 		// A shot digs into dirt along its line like a light attack: one block deep for the first shot, two, then three.
 		if (breakDepth > 0 && Protection.rubyDigs()) {
@@ -321,6 +321,7 @@ final class HitService {
 		if (RubyLevel.burstShots() && (best != null || blockHit)) {
 			Vec3d at = best != null && !pierce ? bestPoint : (blockHit ? end : bestPoint);
 			client.world.addParticle(ParticleTypes.EXPLOSION, at.x, at.y, at.z, 0, 0, 0);
+			for (int i = 0; i < 14; i++) Glow.spark(at, (Math.random() - 0.5) * 0.35, (Math.random() - 0.2) * 0.3, (Math.random() - 0.5) * 0.35, 12 + (int) (Math.random() * 8), 0.11f);
 			for (Entity e : client.world.getOtherEntities(p, new Box(at, at).expand(2.5), HitService::isTarget)) {
 				if (!struck.contains(e.getUuid()) && e.squaredDistanceTo(at) <= 2.5 * 2.5 && struck.size() < 10) struck.add(e.getUuid());
 			}

@@ -201,6 +201,8 @@ public class GrimmMcClient implements ClientModInitializer {
 		});
 
 		WorldRenderEvents.AFTER_ENTITIES.register(GrimmMcClient::render);
+		WorldRenderEvents.AFTER_ENTITIES.register(Glow::render);
+		Glow.init();
 	}
 
 	static KeyBinding key(String name, int code) {
@@ -693,6 +695,7 @@ public class GrimmMcClient implements ClientModInitializer {
 		var net = p.networkHandler;
 		if (n >= 90 && n < 400) { p.setYaw(0f); p.setPitch(6f); }
 		if (n == 92 && net != null) net.sendChatCommand("gamemode creative");
+		if (n == 110 && System.getenv("GRIMMMC_POSSESS") != null) togglePossess(client);
 		if (n == 94 && net != null) net.sendChatCommand("time set " + (System.getenv("GRIMMMC_TIME") == null ? "noon" : System.getenv("GRIMMMC_TIME")));
 		if (n == 96 && net != null) {
 			net.sendChatCommand("summon grimmmc:deathstalker_medium ~-9 ~ ~9 {NoAI:1b,Rotation:[180f,0f]}");
@@ -702,7 +705,12 @@ public class GrimmMcClient implements ClientModInitializer {
 			net.sendChatCommand("summon grimmmc:mutant_creep_medium ~5 ~ ~10 {NoAI:1b,Rotation:[180f,0f]}");
 			net.sendChatCommand("summon grimmmc:beowolf_medium ~0 ~ ~16 {NoAI:1b,Rotation:[180f,0f]}");
 		}
-		if (n == 130 || n == 150 || n == 170) shoot(client);
+		boolean fx = System.getenv("GRIMMMC_POSSESS") != null;
+		if (fx && (n == 122 || n == 130)) client.options.dropKey.setPressed(true);   // two shots
+		if (fx && (n == 125 || n == 133)) client.options.dropKey.setPressed(false);
+		if (fx && n == 140) client.options.sneakKey.setPressed(true);                // a dodge: petals
+		if (fx && n == 142) client.options.sneakKey.setPressed(false);
+		if (fx ? (n == 128 || n == 136 || n == 148) : (n == 130 || n == 150 || n == 170)) shoot(client);
 		if (n == 180) client.scheduleStop();
 	}
 	static int wallBefore;
@@ -1306,6 +1314,7 @@ public class GrimmMcClient implements ClientModInitializer {
 		ms.scale(SCALE, SCALE, SCALE);
 		MatrixStack.Entry entry = ms.peek();
 		Matrix4f m = entry.getPositionMatrix();
+		rubyLight = worldLight(client, at);
 
 		VertexConsumer vc = ctx.consumers().getBuffer(RenderLayer.getEntityCutoutNoCull(TEXTURE));
 		int triangles = 0;
@@ -1337,6 +1346,20 @@ public class GrimmMcClient implements ClientModInitializer {
 
 	static float[] propScratch = new float[0];
 
+	/** The light Ruby is drawn with (set before each draw), so she follows the world's light. */
+	static int rubyLight = 15728880;
+	/** Direction of Ruby's face normals for lighting (-1: the cross product after the X mirror points into the model; 1 is the old look); GRIMMMC_RNSIGN in the self tests. */
+	static final float RUBY_NSIGN = AUTO && System.getenv("GRIMMMC_RNSIGN") != null ? Float.parseFloat(System.getenv("GRIMMMC_RNSIGN")) : -1f;
+
+	/** The world's light at a spot, never darker than a dim minimum (block 5, sky 5) so Ruby is always readable; GRIMMMC_RUBYLIGHT=full restores the old flat full brightness. */
+	static int worldLight(MinecraftClient client, Vec3d at) {
+		if (AUTO && "full".equals(System.getenv("GRIMMMC_RUBYLIGHT"))) return 15728880;
+		if (client.world == null) return 15728880;
+		int packed = net.minecraft.client.render.WorldRenderer.getLightmapCoordinates(client.world, net.minecraft.util.math.BlockPos.ofFloored(at.x, at.y + 1.0, at.z));
+		int block = Math.max(5, (packed >> 4) & 15), sky = Math.max(5, (packed >> 20) & 15);
+		return (block << 4) | (sky << 20);
+	}
+
 	/** Emit triangles from Unity-space positions (left-handed, Y-up), mirrored on X for Minecraft. */
 	static void emit(VertexConsumer vc, Matrix4f m, MatrixStack.Entry entry,
 			float[] p, float[] uv, int[] indices, int first, int count) {
@@ -1350,6 +1373,7 @@ public class GrimmMcClient implements ClientModInitializer {
 			float nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
 			float len = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
 			if (len > 0) { nx /= len; ny /= len; nz /= len; }
+			nx *= RUBY_NSIGN; ny *= RUBY_NSIGN; nz *= RUBY_NSIGN;
 			vert(vc, m, entry, ax, ay, az, uv[a * 2], uv[a * 2 + 1], nx, ny, nz);
 			vert(vc, m, entry, bx, by, bz, uv[b * 2], uv[b * 2 + 1], nx, ny, nz);
 			vert(vc, m, entry, cx, cy, cz, uv[c * 2], uv[c * 2 + 1], nx, ny, nz);
@@ -1364,7 +1388,7 @@ public class GrimmMcClient implements ClientModInitializer {
 			.color(255, 255, 255, 255)
 			.texture(u, 1.0f - v) // source V is bottom-up
 			.overlay(OverlayTexture.DEFAULT_UV)
-			.light(15728880)
+			.light(rubyLight)
 			.normal(entry, nx, ny, nz);
 	}
 }

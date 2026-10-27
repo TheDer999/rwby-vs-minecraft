@@ -46,8 +46,8 @@ final class Fx {
 		if (c.world == null) return;
 		var r = c.world.random;
 		for (int i = 0; i < count; i++) {
-			c.world.addParticle(r.nextInt(3) == 0 ? PETAL_DARK : PETAL, at.x + (r.nextDouble() - 0.5) * 0.7, at.y + 0.2 + r.nextDouble() * 1.4,
-				at.z + (r.nextDouble() - 0.5) * 0.7, (r.nextDouble() - 0.5) * 0.05, 0.02, (r.nextDouble() - 0.5) * 0.05);
+			Glow.petal(new Vec3d(at.x + (r.nextDouble() - 0.5) * 0.7, at.y + 0.2 + r.nextDouble() * 1.4, at.z + (r.nextDouble() - 0.5) * 0.7),
+				(r.nextDouble() - 0.5) * 0.05, 0.02, (r.nextDouble() - 0.5) * 0.05, r.nextInt(3) == 0);
 		}
 	}
 
@@ -58,7 +58,7 @@ final class Fx {
 		var r = c.world.random;
 		for (int i = 0; i < count; i++) {
 			double a = r.nextDouble() * Math.PI * 2, s = ring ? 0.35 : 0.15 + r.nextDouble() * 0.2;
-			c.world.addParticle(PETAL, at.x, at.y + 0.5, at.z, Math.cos(a) * s, 0.05 + r.nextDouble() * 0.1, Math.sin(a) * s);
+			Glow.petal(new Vec3d(at.x, at.y + 0.5, at.z), Math.cos(a) * s, 0.05 + r.nextDouble() * 0.1, Math.sin(a) * s, r.nextInt(4) == 0);
 		}
 		if (ring) for (int i = 0; i < 10; i++) {
 			double a = i * Math.PI / 5;
