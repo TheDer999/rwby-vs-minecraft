@@ -62,7 +62,7 @@ final class GrimmModels {
 				if (!Files.exists(png)) { m.textures[i] = i > 0 ? m.textures[0] : null; continue; }
 				try (InputStream in = Files.newInputStream(png)) {
 					Identifier id = Identifier.of("grimmmc", "grimm/" + kind.id + "_" + i);
-					client.getTextureManager().registerTexture(id, new NativeImageBackedTexture(NativeImage.read(in)));
+					client.getTextureManager().registerTexture(id, mipmapped(new NativeImageBackedTexture(NativeImage.read(in))));
 					m.textures[i] = id;
 				}
 			}
@@ -71,7 +71,7 @@ final class GrimmModels {
 				if (!Files.exists(png)) continue;
 				try (InputStream in = Files.newInputStream(png)) {
 					Identifier id = Identifier.of("grimmmc", "grimm/" + kind.id + "_glow_" + i);
-					client.getTextureManager().registerTexture(id, new NativeImageBackedTexture(NativeImage.read(in)));
+					client.getTextureManager().registerTexture(id, mipmapped(new NativeImageBackedTexture(NativeImage.read(in))));
 					m.glow[i] = id;
 				}
 			}
@@ -86,6 +86,15 @@ final class GrimmModels {
 			GrimmMcClient.LOG.error("Could not load the {} model", kind.id, e);
 			return null;
 		}
+	}
+
+	/** Smooth minification: without mipmaps the thin glowing lines and the fine texture detail shimmer as a Grimm moves away or the camera moves. */
+	private static NativeImageBackedTexture mipmapped(NativeImageBackedTexture tex) {
+		com.mojang.blaze3d.platform.GlStateManager._bindTexture(tex.getGlId());
+		org.lwjgl.opengl.GL30.glGenerateMipmap(org.lwjgl.opengl.GL11.GL_TEXTURE_2D);
+		com.mojang.blaze3d.platform.GlStateManager._texParameter(org.lwjgl.opengl.GL11.GL_TEXTURE_2D, org.lwjgl.opengl.GL11.GL_TEXTURE_MIN_FILTER, org.lwjgl.opengl.GL11.GL_LINEAR_MIPMAP_LINEAR);
+		com.mojang.blaze3d.platform.GlStateManager._texParameter(org.lwjgl.opengl.GL11.GL_TEXTURE_2D, org.lwjgl.opengl.GL11.GL_TEXTURE_MAG_FILTER, org.lwjgl.opengl.GL11.GL_LINEAR);
+		return tex;
 	}
 
 	/** Depth below the origin of the lowest point of the idle pose (0 when the feet are at the origin or above). */
@@ -157,7 +166,7 @@ final class GrimmModels {
 			Identifier tex = m.textures[Math.min(sm, m.textures.length - 1)];
 			if (tex == null) continue;
 			VertexConsumer vc = vcp.getBuffer(ca < 255 ? RenderLayer.getEntityTranslucent(tex) : RenderLayer.getEntityCutoutNoCull(tex));
-			emit(vc, mat, entry, m.skinned, rig.uvs, rig.indices, rig.subs[sm][0], rig.subs[sm][1], light, overlay, cr, cg, cb, ca);
+			emit(vc, mat, entry, m.skinned, rig.uvs, rig.indices, rig.subs[sm][0], rig.subs[sm][1], light, overlay, cr, cg, cb, ca, 0f);
 		}
 		// the eyes and crystals shine at full brightness whatever the light, until the Grimm starts to fade
 		if (fade < 0.35f && m.glow != null) {
@@ -165,15 +174,20 @@ final class GrimmModels {
 				Identifier g = sm < m.glow.length ? m.glow[sm] : null;
 				if (g == null) continue;
 				VertexConsumer gv = vcp.getBuffer(RenderLayer.getEyes(g));
-				emit(gv, mat, entry, m.skinned, rig.uvs, rig.indices, rig.subs[sm][0], rig.subs[sm][1], 15728880, OverlayTexture.DEFAULT_UV, 255, 255, 255, 255);
+				emit(gv, mat, entry, m.skinned, rig.uvs, rig.indices, rig.subs[sm][0], rig.subs[sm][1], 15728880, OverlayTexture.DEFAULT_UV, 255, 255, 255, 255, GLOW_PUSH);
 			}
 		}
 		ms.pop();
 	}
 
 	/** Triangles from Unity-space positions (left-handed, Y-up), mirrored on X for Minecraft. */
+	/** The cross product of a triangle after the X mirror points into the model, so lighting needs it flipped (-1); GRIMMMC_NSIGN=1 restores the old look in self tests. */
+	private static final float NSIGN = GrimmMcClient.AUTO && "1".equals(System.getenv("GRIMMMC_NSIGN")) ? 1f : -1f;
+	/** The glow layer is drawn this far (model units) out along the surface normal so it never flickers against the body. */
+	private static final float GLOW_PUSH = GrimmMcClient.AUTO && System.getenv("GRIMMMC_PUSH") != null ? Float.parseFloat(System.getenv("GRIMMMC_PUSH")) : 0.01f;
+
 	private static void emit(VertexConsumer vc, Matrix4f m, MatrixStack.Entry entry, float[] p, float[] uv, int[] indices,
-			int first, int count, int light, int overlay, int cr, int cg, int cb, int ca) {
+			int first, int count, int light, int overlay, int cr, int cg, int cb, int ca, float push) {
 		for (int i = first; i + 2 < first + count; i += 3) {
 			int a = indices[i], b = indices[i + 1], c = indices[i + 2];
 			float ax = -p[a * 3], ay = p[a * 3 + 1], az = p[a * 3 + 2];
@@ -184,10 +198,12 @@ final class GrimmModels {
 			float nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
 			float len = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
 			if (len > 0) { nx /= len; ny /= len; nz /= len; }
-			vert(vc, m, entry, ax, ay, az, uv[a * 2], uv[a * 2 + 1], nx, ny, nz, light, overlay, cr, cg, cb, ca);
-			vert(vc, m, entry, bx, by, bz, uv[b * 2], uv[b * 2 + 1], nx, ny, nz, light, overlay, cr, cg, cb, ca);
-			vert(vc, m, entry, cx, cy, cz, uv[c * 2], uv[c * 2 + 1], nx, ny, nz, light, overlay, cr, cg, cb, ca);
-			vert(vc, m, entry, cx, cy, cz, uv[c * 2], uv[c * 2 + 1], nx, ny, nz, light, overlay, cr, cg, cb, ca); // entity layers draw quads
+			nx *= NSIGN; ny *= NSIGN; nz *= NSIGN;
+			float ox = nx * push, oy = ny * push, oz = nz * push;
+			vert(vc, m, entry, ax + ox, ay + oy, az + oz, uv[a * 2], uv[a * 2 + 1], nx, ny, nz, light, overlay, cr, cg, cb, ca);
+			vert(vc, m, entry, bx + ox, by + oy, bz + oz, uv[b * 2], uv[b * 2 + 1], nx, ny, nz, light, overlay, cr, cg, cb, ca);
+			vert(vc, m, entry, cx + ox, cy + oy, cz + oz, uv[c * 2], uv[c * 2 + 1], nx, ny, nz, light, overlay, cr, cg, cb, ca);
+			vert(vc, m, entry, cx + ox, cy + oy, cz + oz, uv[c * 2], uv[c * 2 + 1], nx, ny, nz, light, overlay, cr, cg, cb, ca); // entity layers draw quads
 		}
 	}
 
