@@ -100,8 +100,63 @@ static class Exporters
         return new TextureResult(name, w, h, fmt, Path.GetFileName(outPng));
     }
 
+    static byte[] DecodeTexture(UnityAssets ua, AssetsFileInstance inst, AssetFileInfo info, out int w, out int h)
+    {
+        var bf = ua.Base(inst, info);
+        string name = UnityAssets.NameOf(inst, info);
+        w = bf["m_Width"].AsInt; h = bf["m_Height"].AsInt;
+        int fmt = bf["m_TextureFormat"].AsInt;
+        if (!Textures.CanDecode(fmt) && !Textures.IsCrunched(fmt))
+            throw new ConvertException(ExitCodes.UnsupportedTexture, $"Texture '{name}' is stored as {Textures.FormatName(fmt)}, which this converter cannot read yet.");
+        byte[] data;
+        var sd = bf["m_StreamData"];
+        if (!sd.IsDummy && sd["size"].AsUInt > 0) data = ua.ReadStream(sd["path"].AsString, sd["offset"].AsUInt, sd["size"].AsUInt);
+        else data = bf["image data"]["Array"].AsByteArray;
+        return Textures.Decode(data, w, h, fmt) ?? throw new ConvertException(ExitCodes.UnsupportedTexture, $"Texture '{name}' could not be unpacked.");
+    }
+
+    /// <summary>
+    /// The parts of a Grimm that glow, as a picture that is black everywhere else (drawn at full brightness, added on top).
+    /// With a glow mask (the mutants' _Mask1) the glow is the model's own colours where the mask is bright; without one (the ordinary Grimm,
+    /// whose eyes are painted into the body texture) it is the saturated orange and bright red pixels. Returns false if nothing glows.
+    /// </summary>
+    public static bool ExportEmissive(UnityAssets ua, (AssetsFileInstance inst, AssetFileInfo info) main, (AssetsFileInstance inst, AssetFileInfo info)? mask, string outPng)
+    {
+        var rgba = DecodeTexture(ua, main.inst, main.info, out int w, out int h);
+        var outp = new byte[w * h * 4];
+        int lit = 0;
+        byte[] m = null; int mw = 0, mh = 0;
+        if (mask != null) m = DecodeTexture(ua, mask.Value.inst, mask.Value.info, out mw, out mh);
+        for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++)
+        {
+            int i = (y * w + x) * 4;
+            byte r = rgba[i], g = rgba[i + 1], b = rgba[i + 2];
+            float k;
+            if (m != null)
+            {
+                int mi = ((y * mh / h) * mw + (x * mw / w)) * 4;
+                k = Math.Max(m[mi], Math.Max(m[mi + 1], m[mi + 2])) / 255f;
+                k = k < 0.15f ? 0f : k;
+            }
+            else k = (r >= 200 && g >= 45 && b <= 110 && r - b >= 110) ? 1f : 0f;
+            if (k <= 0f) { outp[i + 3] = 255; continue; }
+            lit++;
+            outp[i] = (byte)Math.Min(255, r * k);
+            outp[i + 1] = (byte)Math.Min(255, g * k);
+            outp[i + 2] = (byte)Math.Min(255, b * k);
+            outp[i + 3] = 255;
+        }
+        if (lit < 20) return false;
+        Textures.WritePng(outPng, outp, w, h);
+        return true;
+    }
+
     /// <summary>The Texture2D bound to _MainTex of a material, or null.</summary>
-    static (AssetsFileInstance inst, AssetFileInfo info)? MainTexture(UnityAssets ua, AssetsFileInstance from, AssetTypeValueField materialPptr)
+    static (AssetsFileInstance inst, AssetFileInfo info)? MainTexture(UnityAssets ua, AssetsFileInstance from, AssetTypeValueField materialPptr) => BoundTexture(ua, from, materialPptr, "_MainTex");
+
+    /// <summary>The Texture2D bound to the named property of a material (the mutants' glow mask is _Mask1), or null.</summary>
+    static (AssetsFileInstance inst, AssetFileInfo info)? BoundTexture(UnityAssets ua, AssetsFileInstance from, AssetTypeValueField materialPptr, string wanted)
     {
         var mat = ua.Resolve(from, materialPptr);
         if (mat.info == null) return null;
@@ -110,7 +165,7 @@ static class Exporters
         {
             string prop;
             try { prop = te["first"]["name"].AsString; } catch { continue; }
-            if (prop != "_MainTex") continue;
+            if (prop != wanted) continue;
             var tex = ua.Resolve(mat.file, te["second"]["m_Texture"]);
             if (tex.info != null && tex.info.TypeId == UnityAssets.Texture2D) return (tex.file, tex.info);
         }
@@ -121,7 +176,8 @@ static class Exporters
 
     public sealed record RigResult(int Vertices, int Bones, int Nodes, int Clips, string BodyTextureName,
         (AssetsFileInstance inst, AssetFileInfo info) BodyTexture,
-        List<(AssetsFileInstance inst, AssetFileInfo info)?> MaterialTextures);
+        List<(AssetsFileInstance inst, AssetFileInfo info)?> MaterialTextures,
+        List<(AssetsFileInstance inst, AssetFileInfo info)?> MaskTextures);
 
     /// <summary>
     /// The combined local transform of everything above a skeleton root in the model's prefab (an import often leaves a rotation or scale
@@ -349,7 +405,8 @@ static class Exporters
         File.WriteAllText(outFile, sb.ToString());
 
         var matTex = sbf["m_Materials"]["Array"].Children.Select(m => MainTexture(ua, smrInst, m)).ToList();
-        return new RigResult(mesh.VertexCount, bind.Length, nodes.Count, clipData.Count, UnityAssets.NameOf(bodyTex.Value.inst, bodyTex.Value.info), bodyTex.Value, matTex);
+        var maskTex = sbf["m_Materials"]["Array"].Children.Select(m => BoundTexture(ua, smrInst, m, "_Mask1")).ToList();
+        return new RigResult(mesh.VertexCount, bind.Length, nodes.Count, clipData.Count, UnityAssets.NameOf(bodyTex.Value.inst, bodyTex.Value.info), bodyTex.Value, matTex, maskTex);
     }
 
     /// <summary>

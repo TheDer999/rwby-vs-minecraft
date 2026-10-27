@@ -693,8 +693,11 @@ public class GrimmMcClient implements ClientModInitializer {
 		var net = p.networkHandler;
 		if (n >= 90 && n < 400) { p.setYaw(0f); p.setPitch(6f); }
 		if (n == 92 && net != null) net.sendChatCommand("gamemode creative");
-		if (n == 94 && net != null) net.sendChatCommand("time set noon");
+		if (n == 94 && net != null) net.sendChatCommand("time set " + (System.getenv("GRIMMMC_TIME") == null ? "noon" : System.getenv("GRIMMMC_TIME")));
 		if (n == 96 && net != null) {
+			net.sendChatCommand("summon grimmmc:deathstalker_medium ~-9 ~ ~9 {NoAI:1b,Rotation:[180f,0f]}");
+			net.sendChatCommand("summon grimmmc:boar_medium ~9 ~ ~8 {NoAI:1b,Rotation:[180f,0f]}");
+			net.sendChatCommand("summon grimmmc:mutant_deathstalker_medium ~-2 ~ ~8 {NoAI:1b,Rotation:[180f,0f]}");
 			net.sendChatCommand("summon grimmmc:mutant_beowolf_medium ~-5 ~ ~12 {NoAI:1b,Rotation:[180f,0f]}");
 			net.sendChatCommand("summon grimmmc:mutant_creep_medium ~5 ~ ~10 {NoAI:1b,Rotation:[180f,0f]}");
 			net.sendChatCommand("summon grimmmc:beowolf_medium ~0 ~ ~16 {NoAI:1b,Rotation:[180f,0f]}");

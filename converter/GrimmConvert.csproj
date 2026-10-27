@@ -10,7 +10,7 @@
     <RootNamespace>GrimmConvert</RootNamespace>
     <InvariantGlobalization>true</InvariantGlobalization>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
-    <Version>0.6.2</Version>
+    <Version>0.7.0</Version>
   </PropertyGroup>
 
   <ItemGroup>

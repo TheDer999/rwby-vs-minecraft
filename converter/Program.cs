@@ -1,4 +1,4 @@
-﻿using System.Security.Cryptography;
+using System.Security.Cryptography;
 using System.Text.Json;
 
 namespace GrimmConvert;
@@ -14,7 +14,7 @@ namespace GrimmConvert;
 /// </summary>
 static class Program
 {
-    const string ConverterVersion = "0.6.2";
+    const string ConverterVersion = "0.7.0";
     const string DataFolderPattern = "*_Data";
     const int ExitNotReady = 10;
 
@@ -146,6 +146,12 @@ static class Program
                         if (mt == null) continue;
                         try { Exporters.ExportTexture(ua, mt.Value.inst, mt.Value.info, Path.Combine(tmp, $"{gid}_texture{mi}.png")); }
                         catch (ConvertException e) when (mi > 0) { Info($"{gid} texture {mi} skipped: {e.Message}"); }
+                        try
+                        {
+                            var mask = mi < gr.MaskTextures.Count ? gr.MaskTextures[mi] : null;
+                            if (Exporters.ExportEmissive(ua, mt.Value, mask, Path.Combine(tmp, $"{gid}_emissive{mi}.png"))) Info($"{gid}: glowing parts of texture {mi} written");
+                        }
+                        catch (Exception e) when (e is ConvertException or IOException) { Info($"{gid} glow {mi} skipped: {e.Message}"); }
                     }
                     grimmOut.Add(new { id = gid, vertices = gr.Vertices, clips = gr.Clips, textures = gr.MaterialTextures.Count });
                 }

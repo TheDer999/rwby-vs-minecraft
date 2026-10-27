@@ -27,6 +27,8 @@ final class GrimmModels {
 	static final class Model {
 		Rig rig;
 		Identifier[] textures;
+		/** The glowing parts of each texture (eyes, crystals), drawn at full brightness on top; null where nothing glows. */
+		Identifier[] glow;
 		float[] skinned;
 		/** How far the model's feet are below its origin in the idle pose, so it can be lifted onto the ground. */
 		float lift;
@@ -53,6 +55,7 @@ final class GrimmModels {
 			m.skinned = new float[m.rig.vertexCount * 3];
 			int n = Math.max(1, m.rig.subs.length);
 			m.textures = new Identifier[n];
+			m.glow = new Identifier[n];
 			MinecraftClient client = MinecraftClient.getInstance();
 			for (int i = 0; i < n; i++) {
 				Path png = d.resolve(kind.id + "_texture" + i + ".png");
@@ -61,6 +64,15 @@ final class GrimmModels {
 					Identifier id = Identifier.of("grimmmc", "grimm/" + kind.id + "_" + i);
 					client.getTextureManager().registerTexture(id, new NativeImageBackedTexture(NativeImage.read(in)));
 					m.textures[i] = id;
+				}
+			}
+			for (int i = 0; i < n; i++) {
+				Path png = d.resolve(kind.id + "_emissive" + i + ".png");
+				if (!Files.exists(png)) continue;
+				try (InputStream in = Files.newInputStream(png)) {
+					Identifier id = Identifier.of("grimmmc", "grimm/" + kind.id + "_glow_" + i);
+					client.getTextureManager().registerTexture(id, new NativeImageBackedTexture(NativeImage.read(in)));
+					m.glow[i] = id;
 				}
 			}
 			m.lift = idleFootDepth(m.rig);
@@ -146,6 +158,15 @@ final class GrimmModels {
 			if (tex == null) continue;
 			VertexConsumer vc = vcp.getBuffer(ca < 255 ? RenderLayer.getEntityTranslucent(tex) : RenderLayer.getEntityCutoutNoCull(tex));
 			emit(vc, mat, entry, m.skinned, rig.uvs, rig.indices, rig.subs[sm][0], rig.subs[sm][1], light, overlay, cr, cg, cb, ca);
+		}
+		// the eyes and crystals shine at full brightness whatever the light, until the Grimm starts to fade
+		if (fade < 0.35f && m.glow != null) {
+			for (int sm = 0; sm < rig.subs.length; sm++) {
+				Identifier g = sm < m.glow.length ? m.glow[sm] : null;
+				if (g == null) continue;
+				VertexConsumer gv = vcp.getBuffer(RenderLayer.getEyes(g));
+				emit(gv, mat, entry, m.skinned, rig.uvs, rig.indices, rig.subs[sm][0], rig.subs[sm][1], 15728880, OverlayTexture.DEFAULT_UV, 255, 255, 255, 255);
+			}
 		}
 		ms.pop();
 	}
