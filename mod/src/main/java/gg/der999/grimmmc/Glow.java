@@ -84,7 +84,8 @@ final class Glow {
 					double d = Math.sqrt(dx * dx + dy * dy);
 					double a = MathHelper.clamp(1.0 - d, 0.0, 1.0);
 					int alpha = (int) Math.round(255 * a * Math.sqrt(a)); // bright core, soft edge
-					img.setColorArgb(x, y, (alpha << 24) | 0xFFFFFF);
+					// The eyes layer adds its colour to what is behind: a transparent pixel must also be black, or the whole quad shows as a coloured rectangle.
+					img.setColorArgb(x, y, (alpha << 24) | (alpha << 16) | (alpha << 8) | alpha);
 				}
 			}
 			NativeImageBackedTexture tex = new NativeImageBackedTexture(img);
@@ -111,12 +112,13 @@ final class Glow {
 			float fade = f < 0.15f ? f / 0.15f : MathHelper.clamp((1f - f) / 0.6f, 0f, 1f);
 			int alpha = Math.round(255 * fade);
 			if (alpha <= 2) continue;
+			int cr = s.r * alpha / 255, cg = s.g * alpha / 255, cb = s.b * alpha / 255; // additive blending ignores alpha, so fade the colour itself
 			ms.push();
 			ms.translate(s.x + s.vx * delta - cam.x, s.y + s.vy * delta - cam.y, s.z + s.vz * delta - cam.z);
 			ms.multiply(ctx.camera().getRotation());
 			Matrix4f m = ms.peek().getPositionMatrix();
 			float h = s.size * (0.6f + 0.4f * (1f - f));
-			quad(vc, m, ms.peek(), h, s.r, s.g, s.b, alpha);
+			quad(vc, m, ms.peek(), h, cr, cg, cb, alpha);
 			ms.pop();
 		}
 	}

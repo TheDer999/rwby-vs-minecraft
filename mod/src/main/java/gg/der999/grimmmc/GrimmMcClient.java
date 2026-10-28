@@ -693,7 +693,7 @@ public class GrimmMcClient implements ClientModInitializer {
 		int n = autoTicks;
 		var p = client.player;
 		var net = p.networkHandler;
-		if (n >= 90 && n < 400) { p.setYaw(0f); p.setPitch(6f); }
+		if (n >= 90 && n < 400) { p.setYaw(System.getenv("GRIMMMC_YAW") == null ? 0f : Float.parseFloat(System.getenv("GRIMMMC_YAW"))); p.setPitch(System.getenv("GRIMMMC_PITCH") == null ? 6f : Float.parseFloat(System.getenv("GRIMMMC_PITCH"))); }
 		if (n == 92 && net != null) net.sendChatCommand("gamemode creative");
 		if (n == 110 && System.getenv("GRIMMMC_POSSESS") != null) togglePossess(client);
 		if (n == 94 && net != null) net.sendChatCommand("time set " + (System.getenv("GRIMMMC_TIME") == null ? "noon" : System.getenv("GRIMMMC_TIME")));
@@ -706,6 +706,7 @@ public class GrimmMcClient implements ClientModInitializer {
 			net.sendChatCommand("summon grimmmc:beowolf_medium ~0 ~ ~16 {NoAI:1b,Rotation:[180f,0f]}");
 		}
 		boolean fx = System.getenv("GRIMMMC_POSSESS") != null;
+		if (fx && n == 105 && net != null) net.sendChatCommand("grimmmc level set 10");
 		if (fx && (n == 122 || n == 130)) client.options.dropKey.setPressed(true);   // two shots
 		if (fx && (n == 125 || n == 133)) client.options.dropKey.setPressed(false);
 		if (fx && n == 140) client.options.sneakKey.setPressed(true);                // a dodge: petals
@@ -1351,12 +1352,12 @@ public class GrimmMcClient implements ClientModInitializer {
 	/** Direction of Ruby's face normals for lighting (-1: the cross product after the X mirror points into the model; 1 is the old look); GRIMMMC_RNSIGN in the self tests. */
 	static final float RUBY_NSIGN = AUTO && System.getenv("GRIMMMC_RNSIGN") != null ? Float.parseFloat(System.getenv("GRIMMMC_RNSIGN")) : -1f;
 
-	/** The world's light at a spot, never darker than a dim minimum (block 5, sky 5) so Ruby is always readable; GRIMMMC_RUBYLIGHT=full restores the old flat full brightness. */
+	/** The world's light at a spot, never darker than a dim minimum (block 3, sky 3) so Ruby is always readable; GRIMMMC_RUBYLIGHT=full restores the old flat full brightness. */
 	static int worldLight(MinecraftClient client, Vec3d at) {
 		if (AUTO && "full".equals(System.getenv("GRIMMMC_RUBYLIGHT"))) return 15728880;
 		if (client.world == null) return 15728880;
 		int packed = net.minecraft.client.render.WorldRenderer.getLightmapCoordinates(client.world, net.minecraft.util.math.BlockPos.ofFloored(at.x, at.y + 1.0, at.z));
-		int block = Math.max(5, (packed >> 4) & 15), sky = Math.max(5, (packed >> 20) & 15);
+		int block = Math.max(3, (packed >> 4) & 15), sky = Math.max(3, (packed >> 20) & 15);
 		return (block << 4) | (sky << 20);
 	}
 

@@ -300,7 +300,7 @@ final class HitService {
 		double len = tip.distanceTo(eye);
 		for (double s = 0.8; s < len; s += 0.8) {
 			Vec3d at = eye.add(dir.multiply(s));
-			Glow.spark(at, 0, 0, 0, 10, 0.07f);
+			Glow.spark(at, 0, 0, 0, 14, 0.1f);
 		}
 		// A shot digs into dirt along its line like a light attack: one block deep for the first shot, two, then three.
 		if (breakDepth > 0 && Protection.rubyDigs()) {
