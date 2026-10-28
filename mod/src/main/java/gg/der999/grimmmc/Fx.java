@@ -41,6 +41,7 @@ final class Fx {
 	}
 
 	/** Rose petals trailing behind Ruby while she dashes. */
+	/** Rose petals around a spot: Ruby's dash trail, and the cloud she turns into while she is out of sight. */
 	static void petals(Vec3d at, int count) {
 		MinecraftClient c = MinecraftClient.getInstance();
 		if (c.world == null) return;

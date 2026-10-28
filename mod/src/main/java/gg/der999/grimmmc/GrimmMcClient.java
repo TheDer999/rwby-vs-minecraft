@@ -711,7 +711,7 @@ public class GrimmMcClient implements ClientModInitializer {
 		if (fx && (n == 125 || n == 133)) client.options.dropKey.setPressed(false);
 		if (fx && n == 140) client.options.sneakKey.setPressed(true);                // a dodge: petals
 		if (fx && n == 142) client.options.sneakKey.setPressed(false);
-		if (fx ? (n == 128 || n == 136 || n == 148) : (n == 130 || n == 150 || n == 170)) shoot(client);
+		if (fx ? (n == 128 || n == 136 || n == 141 || n == 143 || n == 146 || n == 149) : (n == 130 || n == 150 || n == 170)) shoot(client);
 		if (n == 180) client.scheduleStop();
 	}
 	static int wallBefore;

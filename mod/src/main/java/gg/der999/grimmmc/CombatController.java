@@ -579,6 +579,10 @@ public final class CombatController {
 	}
 
 	void setVisible(boolean v) {
+		if (v != visible) { // Ruby turns into rose petals as she vanishes in a dash, and out of them as she returns
+			ClientPlayerEntity p = MinecraftClient.getInstance().player;
+			if (p != null) Fx.petals(p.getPos(), v ? 26 : 40);
+		}
 		visible = v;
 	}
 
@@ -647,7 +651,7 @@ public final class CombatController {
 				&& Math.hypot(target.getX() - p.getX(), target.getZ() - p.getZ()) <= PUSH_STOP_DISTANCE;
 			if (!blocked) {
 				smoothPushSpeed += (pushSpeed - smoothPushSpeed) * Math.min(1f, 15f * DT);
-				if (smoothPushSpeed >= 20f && visible) Fx.petals(p.getPos(), 3);
+				if (smoothPushSpeed >= 20f) Fx.petals(p.getPos(), visible ? 3 : 10); // a cloud of petals stands in for her while she is gone
 				float yaw = facingYaw * MathHelper.RADIANS_PER_DEGREE;
 				double perTick = smoothPushSpeed / 20.0;
 				vx = -MathHelper.sin(yaw) * perTick;

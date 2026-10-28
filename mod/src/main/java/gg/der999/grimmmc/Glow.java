@@ -52,7 +52,7 @@ final class Glow {
 
 	/** A rose petal: red (some darker), drifts and falls a little. */
 	static void petal(Vec3d at, double vx, double vy, double vz, boolean dark) {
-		Spark s = make(at, vx, vy, vz, 22 + MinecraftClient.getInstance().world.random.nextInt(14), 0.16f + (dark ? 0f : 0.04f));
+		Spark s = make(at, vx, vy, vz, 24 + MinecraftClient.getInstance().world.random.nextInt(16), 0.22f + (dark ? 0f : 0.05f));
 		s.r = dark ? 120 : 235; s.g = dark ? 20 : 40; s.b = dark ? 35 : 55;
 		s.gravity = 0.004;
 	}
