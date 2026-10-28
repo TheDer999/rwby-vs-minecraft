@@ -706,6 +706,14 @@ public class GrimmMcClient implements ClientModInitializer {
 			net.sendChatCommand("summon grimmmc:beowolf_medium ~0 ~ ~16 {NoAI:1b,Rotation:[180f,0f]}");
 		}
 		boolean fx = System.getenv("GRIMMMC_POSSESS") != null;
+		if (System.getenv("GRIMMMC_REAP") != null) { // Ruby reaps the Deathstalker: a frame every 2 ticks while she vanishes
+			if (n == 112) client.options.hudHidden = true;
+			if (n == 125) client.options.sprintKey.setPressed(true);
+			if (n == 127) client.options.sprintKey.setPressed(false);
+			if (n >= 124 && n <= 150 && n % 2 == 0) shoot(client);
+			if (n == 152) client.scheduleStop();
+			return;
+		}
 		if (fx && n == 105 && net != null) net.sendChatCommand("grimmmc level set 10");
 		if (fx && (n == 122 || n == 130)) client.options.dropKey.setPressed(true);   // two shots
 		if (fx && (n == 125 || n == 133)) client.options.dropKey.setPressed(false);
