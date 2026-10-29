@@ -64,6 +64,14 @@ final class Glow {
 		s.gravity = 0.0;
 	}
 
+	/** A puff of a dying Grimm's mist: red (glowing) or near black, rising slowly. */
+	static void mist(Vec3d at, boolean red, float size) {
+		java.util.Random r = new java.util.Random();
+		Spark s = make(at, (r.nextDouble() - 0.5) * 0.03, 0.02 + r.nextDouble() * 0.03, (r.nextDouble() - 0.5) * 0.03, 16 + r.nextInt(12), size);
+		if (red) { s.r = 200; s.g = 18; s.b = 18; } else { s.r = 22; s.g = 22; s.b = 24; }
+		s.gravity = 0.0;
+	}
+
 	private static Spark make(Vec3d at, double vx, double vy, double vz, int life, float size) {
 		Spark s = new Spark();
 		s.x = at.x; s.y = at.y; s.z = at.z; s.vx = vx; s.vy = vy; s.vz = vz;

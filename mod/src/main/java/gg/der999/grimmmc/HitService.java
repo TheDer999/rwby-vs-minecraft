@@ -317,11 +317,14 @@ final class HitService {
 			if (pierce) for (Entity e : onLine) { if (struck.size() < 6) struck.add(e.getUuid()); }
 			else struck.add(best.getUuid());
 		}
-		// From level 5 a shot bursts where it lands: it hurts what is near and breaks the softer blocks around the spot.
-		if (RubyLevel.burstShots() && (best != null || blockHit)) {
+		// Every shot shows a burst where it lands (it helps to aim); from level 5 it also hurts what is near and breaks the softer blocks around the spot.
+		if (best != null || blockHit) {
 			Vec3d at = best != null && !pierce ? bestPoint : (blockHit ? end : bestPoint);
 			client.world.addParticle(ParticleTypes.EXPLOSION, at.x, at.y, at.z, 0, 0, 0);
 			for (int i = 0; i < 14; i++) Glow.spark(at, (Math.random() - 0.5) * 0.35, (Math.random() - 0.2) * 0.3, (Math.random() - 0.5) * 0.35, 12 + (int) (Math.random() * 8), 0.11f);
+		}
+		if (RubyLevel.burstShots() && (best != null || blockHit)) {
+			Vec3d at = best != null && !pierce ? bestPoint : (blockHit ? end : bestPoint);
 			for (Entity e : client.world.getOtherEntities(p, new Box(at, at).expand(2.5), HitService::isTarget)) {
 				if (!struck.contains(e.getUuid()) && e.squaredDistanceTo(at) <= 2.5 * 2.5 && struck.size() < 10) struck.add(e.getUuid());
 			}

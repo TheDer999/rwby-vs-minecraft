@@ -130,6 +130,20 @@ public class GrimmEntity extends HostileEntity {
 		if (getWorld() instanceof ServerWorld world && !isRemoved()) {
 			mist(world);
 			if (deathTime >= deathTicks()) remove(RemovalReason.KILLED);
+		} else if (getWorld().isClient) {
+			clientMist();
+		}
+	}
+
+	/** The mist itself is drawn on the client as glowing sparks (Minecraft's dust is lit like the world and looked dull at night). */
+	private void clientMist() {
+		float f = deathTime / (float) deathTicks();
+		if (f < 0.35f) return;
+		boolean red = f < 0.65f;
+		int count = 2 + size * 2 + (kind.mutant() ? 3 : 0);
+		double w = getWidth() * 0.45, h = getHeight() * 0.5;
+		for (int i = 0; i < count; i++) {
+			Glow.mist(new net.minecraft.util.math.Vec3d(getX() + (random.nextDouble() - 0.5) * w * 2, getY() + getHeight() * 0.5 + (random.nextDouble() - 0.5) * h * 2, getZ() + (random.nextDouble() - 0.5) * w * 2), red, 0.22f + size * 0.07f);
 		}
 	}
 
@@ -143,9 +157,7 @@ public class GrimmEntity extends HostileEntity {
 		float f = deathTime / (float) deathTicks();
 		if (f < 0.35f) return;
 		boolean red = f < 0.65f;
-		int count = 3 + size * 3 + (kind.mutant() ? 4 : 0);
 		double w = getWidth() * 0.4, h = getHeight() * 0.4;
-		world.spawnParticles(new DustParticleEffect(red ? 0xB01010 : 0x151515, 1.5f + size * 0.4f), getX(), getY() + getHeight() * 0.5, getZ(), count, w, h, w, 0.02);
 		if (!red && deathTime % 2 == 0) world.spawnParticles(ParticleTypes.LARGE_SMOKE, getX(), getY() + getHeight() * 0.4, getZ(), 1 + size, w, h, w, 0.01);
 	}
 
