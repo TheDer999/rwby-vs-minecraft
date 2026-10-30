@@ -5,7 +5,7 @@
     {"role": "primary", "slug": "minecraft-java"},
     {"role": "secondary", "slug": "custom-rwby-grimm-eclipse"}
   ],
-  "components": [{"id": "main", "kind": "main", "label": "Grimm Eclipse in Minecraft (Prism Launcher with the GrimmMC instance)", "fileName": "GrimmMC-0.20.0.zip", "required": true}],
+  "components": [{"id": "main", "kind": "main", "label": "Grimm Eclipse in Minecraft (Prism Launcher with the GrimmMC instance)", "fileName": "GrimmMC-0.20.1.zip", "required": true}],
   "requirements": [],
   "mappings": [{"component": "main", "from": "", "to": "{localappdata}/GrimmMC"}],
   "setup": {
@@ -25,4 +25,5 @@
     "firstLaunch": "Minecraft is set up first (a few minutes), then the first start converts your Grimm Eclipse data (about a minute, progress shows on the title screen). In a world, press O to become Ruby."
   }
 }
+
 

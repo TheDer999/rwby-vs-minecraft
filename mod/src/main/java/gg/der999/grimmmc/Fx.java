@@ -35,7 +35,16 @@ final class Fx {
 		if (p == null || c.world == null) return;
 		float yaw = facingYaw * MathHelper.RADIANS_PER_DEGREE;
 		Vec3d at = p.getPos().add(-MathHelper.sin(yaw) * 1.5, 1.0, MathHelper.cos(yaw) * 1.5);
-		c.world.addParticle(damage >= 150f ? ParticleTypes.SWEEP_ATTACK : ParticleTypes.SWEEP_ATTACK, at.x, at.y, at.z, 0, 0, 0);
+		// the slash: a crescent of bright sparks across Ruby's front (Minecraft's sweep sprite is lit like the world and dull at night)
+		int n = damage >= 150f ? 12 : 9;
+		float half = damage >= 150f ? 1.5f : 1.1f;
+		for (int i = 0; i < n; i++) {
+			double t = (i / (double) (n - 1)) * 2 - 1;
+			double side = t * half, bow = (1 - t * t) * 0.35;
+			double dx = -MathHelper.sin(yaw), dz = MathHelper.cos(yaw);
+			Vec3d pt = new Vec3d(at.x + dz * side + dx * bow, at.y + 0.25 - t * 0.35, at.z - dx * side + dz * bow);
+			Glow.puff(pt, dz * 0.06, 0.0, -dx * 0.06, 6 + i % 3, 0.16f, 255, 235, 240);
+		}
 		sound(damage >= 300f ? SoundEvents.ITEM_MACE_SMASH_GROUND : damage >= 100f ? SoundEvents.ENTITY_PLAYER_ATTACK_STRONG : SoundEvents.ENTITY_PLAYER_ATTACK_SWEEP,
 			0.7f, damage >= 300f ? 1.1f : 1.0f);
 	}
@@ -63,7 +72,7 @@ final class Fx {
 		}
 		if (ring) for (int i = 0; i < 10; i++) {
 			double a = i * Math.PI / 5;
-			c.world.addParticle(ParticleTypes.POOF, at.x + Math.cos(a) * 0.6, at.y + 0.1, at.z + Math.sin(a) * 0.6, Math.cos(a) * 0.1, 0.02, Math.sin(a) * 0.1);
+			Glow.puff(new Vec3d(at.x + Math.cos(a) * 0.6, at.y + 0.15, at.z + Math.sin(a) * 0.6), Math.cos(a) * 0.1, 0.02, Math.sin(a) * 0.1, 14, 0.24f, 235, 230, 235);
 		}
 	}
 

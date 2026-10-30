@@ -320,7 +320,7 @@ final class HitService {
 		// Every shot shows a burst where it lands (it helps to aim); from level 5 it also hurts what is near and breaks the softer blocks around the spot.
 		if (best != null || blockHit) {
 			Vec3d at = best != null && !pierce ? bestPoint : (blockHit ? end : bestPoint);
-			client.world.addParticle(ParticleTypes.EXPLOSION, at.x, at.y, at.z, 0, 0, 0);
+			for (int i = 0; i < 8; i++) Glow.puff(at, (Math.random() - 0.5) * 0.2, (Math.random() - 0.3) * 0.15, (Math.random() - 0.5) * 0.2, 10 + (int) (Math.random() * 6), 0.3f, 255, 225, 200);
 			for (int i = 0; i < 14; i++) Glow.spark(at, (Math.random() - 0.5) * 0.35, (Math.random() - 0.2) * 0.3, (Math.random() - 0.5) * 0.35, 12 + (int) (Math.random() * 8), 0.11f);
 		}
 		if (RubyLevel.burstShots() && (best != null || blockHit)) {

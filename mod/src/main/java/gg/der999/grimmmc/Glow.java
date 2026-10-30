@@ -64,6 +64,13 @@ final class Glow {
 		s.gravity = 0.0;
 	}
 
+	/** A bright puff of the given colour (stands in for Minecraft's poof, sweep and explosion particles, which are lit like the world). */
+	static void puff(Vec3d at, double vx, double vy, double vz, int life, float size, int r, int g, int b) {
+		Spark s = make(at, vx, vy, vz, life, size);
+		s.r = r; s.g = g; s.b = b;
+		s.gravity = 0.0;
+	}
+
 	/** A puff of a dying Grimm's mist: red (glowing) or near black, rising slowly. */
 	static void mist(Vec3d at, boolean red, float size) {
 		java.util.Random r = new java.util.Random();
