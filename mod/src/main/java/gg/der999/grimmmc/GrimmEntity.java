@@ -103,8 +103,31 @@ public class GrimmEntity extends HostileEntity {
 			if (damage != null) damage.setBaseValue(kind.damage[size] * RubyLevel.mutantDamageScale());
 			setHealth(getMaxHealth());
 		}
+		// the further from home, the fiercer: faster, harder hitting and hunting from much farther away (saved with the Grimm)
+		int realm = realm(world.toServerWorld());
+		if (realm > 0) {
+			boost(EntityAttributes.MOVEMENT_SPEED, realm == 1 ? 0.15 : 0.30, "realm_speed");
+			boost(EntityAttributes.ATTACK_DAMAGE, realm == 1 ? 0.25 : 0.50, "realm_damage");
+			boost(EntityAttributes.FOLLOW_RANGE, realm == 1 ? 0.25 : 0.4, "realm_range");
+		}
 		return result;
 	}
+
+	private void boost(net.minecraft.registry.entry.RegistryEntry<net.minecraft.entity.attribute.EntityAttribute> attribute, double amount, String name) {
+		var instance = getAttributeInstance(attribute);
+		net.minecraft.util.Identifier id = net.minecraft.util.Identifier.of("grimmmc", name);
+		if (instance != null && instance.getModifier(id) == null) {
+			instance.addPersistentModifier(new net.minecraft.entity.attribute.EntityAttributeModifier(id, amount, net.minecraft.entity.attribute.EntityAttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
+		}
+	}
+
+	/** Which world it is: 0 the Overworld, 1 the Nether, 2 the End. The Grimm are fiercer and more destructive in the Nether, and fiercest in the End. */
+	static int realm(World world) {
+		var key = world.getRegistryKey();
+		return key == World.NETHER ? 1 : key == World.END ? 2 : 0;
+	}
+
+	int realm() { return realm(getWorld()); }
 
 	GrimmKind kind() { return kind; }
 
@@ -195,7 +218,7 @@ public class GrimmEntity extends HostileEntity {
 
 	/** The mutant Creep blows itself up: a big explosion that harms what is near and, unless digging is off or placed blocks are spared, breaks blocks. */
 	void explode(ServerWorld world) {
-		float power = new float[] {2.0f, 3.5f, 6.0f}[size];
+		float power = new float[] {2.0f, 3.5f, 6.0f}[size] * (1f + 0.3f * realm());
 		boolean blocks = Protection.grimmDigs() && !Protection.sparesPlaced() && world.getGameRules().getBoolean(GameRules.DO_MOB_GRIEFING);
 		world.createExplosion(this, getX(), getY() + getHeight() / 2.0, getZ(), power,
 			blocks ? World.ExplosionSourceType.MOB : World.ExplosionSourceType.NONE);
@@ -205,7 +228,8 @@ public class GrimmEntity extends HostileEntity {
 	/** Breaks blocks in front of it, as deep as its size allows (small 1, medium 2, large 4 of a block's hardness). */
 	void dig(ServerWorld world) {
 		if (!Protection.grimmDigs() || !world.getGameRules().getBoolean(GameRules.DO_MOB_GRIEFING)) return;
-		int budget = kind.dig[size] + (kind.mutant() ? RubyLevel.mutantDigBonus() : 0);
+		int realm = realm();
+		int budget = kind.dig[size] + (kind.mutant() ? RubyLevel.mutantDigBonus() : 0) + (realm == 1 ? (kind.mutant() ? 2 : 1) : realm == 2 ? 3 : 0);
 		float yaw = getBodyYaw() * MathHelper.RADIANS_PER_DEGREE;
 		Vec3d fwd = new Vec3d(-MathHelper.sin(yaw), 0, MathHelper.cos(yaw));
 		Vec3d right = new Vec3d(-MathHelper.cos(yaw), 0, -MathHelper.sin(yaw));
@@ -231,6 +255,9 @@ public class GrimmEntity extends HostileEntity {
 		if (world.getDifficulty() == net.minecraft.world.Difficulty.PEACEFUL) return false;
 		if (!world.getBlockState(pos.down()).isSolidBlock(world, pos.down())) return false;
 		int size = sizeOf(type);
+		int realm = realm(world.toServerWorld());
+		if (realm == 2) return false; // the End has only the mutants the spawner brings
+		if (realm == 1) return size < 2 || random.nextInt(4) != 0; // the Nether is always night, and mostly large ones
 		long time = world.toServerWorld().getTimeOfDay() % 24000L;
 		boolean night = time >= 13000L && time < 23000L;
 		return switch (size) {
@@ -313,7 +340,8 @@ public class GrimmEntity extends HostileEntity {
 			g.getLookControl().lookAt(t, 40f, 40f);
 			if (cooldown > 0) cooldown--;
 			// Smash whatever is in the way as it advances (a Grimm does not walk around walls).
-			if (attackLeft <= 0 && (g.age % (g.kind.mutant() ? 4 : 7)) == 0 && g.getWorld() instanceof ServerWorld sw && g.getPos().squaredDistanceTo(lastPos) >= 0 && !g.inReach(t)) {
+			int realm = g.realm();
+			if (attackLeft <= 0 && (g.age % ((g.kind.mutant() ? 4 : 7) + 2 * realm)) == 0 && g.getWorld() instanceof ServerWorld sw && g.getPos().squaredDistanceTo(lastPos) >= 0 && !g.inReach(t)) {
 				double dx = t.getX() - g.getX(), dz = t.getZ() - g.getZ();
 				float yaw = (float) (MathHelper.atan2(-dx, dz) * 57.29577951308232);
 				if (g.horizontalCollision || g.getNavigation().isIdle() || g.squaredDistanceTo(t) > 4) {
@@ -343,7 +371,7 @@ public class GrimmEntity extends HostileEntity {
 			// Stuck behind a wall: smash it.
 			if (g.getPos().squaredDistanceTo(lastPos) < 0.01) stuck++;
 			else { stuck = 0; lastPos = g.getPos(); }
-			if (stuck > 12 && cooldown <= 0 && g.squaredDistanceTo(t) < 24 * 24) {
+			if (stuck > 12 + 4 * realm && cooldown <= 0 && g.squaredDistanceTo(t) < 24 * 24) {
 				stuck = 0;
 				begin();
 			}
@@ -353,7 +381,7 @@ public class GrimmEntity extends HostileEntity {
 			g.startAttack(g.getTarget());
 			attackLeft = (int) (g.kind.attackSeconds[g.attackVariant()] * 20f);
 			hitDone = false;
-			cooldown = attackLeft + 5 + g.random.nextInt(6);
+			cooldown = attackLeft + Math.max(1, 5 - 2 * g.realm()) + g.random.nextInt(6);
 		}
 	}
 }
