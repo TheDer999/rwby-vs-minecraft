@@ -66,7 +66,7 @@ public class GrimmEntity extends HostileEntity {
 			.add(EntityAttributes.ATTACK_DAMAGE, kind.damage[size])
 			.add(EntityAttributes.MOVEMENT_SPEED, kind.speed[size])
 			.add(EntityAttributes.FOLLOW_RANGE, 20 + size * 6)
-			.add(EntityAttributes.KNOCKBACK_RESISTANCE, size * 0.25)
+			.add(EntityAttributes.KNOCKBACK_RESISTANCE, size * 0.15)
 			.add(EntityAttributes.ATTACK_KNOCKBACK, 0.3 + size * 0.3);
 	}
 
@@ -128,6 +128,27 @@ public class GrimmEntity extends HostileEntity {
 	}
 
 	int realm() { return realm(getWorld()); }
+
+	/** The age until which a hit has staggered it: it neither moves nor starts a swing, so a hit knocks it back like any hostile mob. */
+	int staggerUntil;
+
+	/** A hit staggers it: small ones longest, large ones barely, and a small or medium Grimm's swing is knocked out of it (large ones and mutants only flinch). */
+	@Override
+	public boolean damage(ServerWorld world, net.minecraft.entity.damage.DamageSource source, float amount) {
+		boolean hurt = super.damage(world, source, amount);
+		if (hurt && isAlive() && amount > 0f) {
+			int ticks = kind.mutant() ? 3 : new int[] {16, 10, 5}[size];
+			staggerUntil = Math.max(staggerUntil, age + ticks);
+			if (!kind.mutant() && size <= 1 && attackTicks() >= 0) dataTracker.set(ATTACK_START, -1);
+		}
+		return hurt;
+	}
+
+	/** The crosshair (and arrows) pick a Grimm from a box this much wider than its body: the head and the long bodies were hard to hit. */
+	@Override
+	public float getTargetingMargin() {
+		return 0.3f + 0.1f * size;
+	}
 
 	GrimmKind kind() { return kind; }
 
@@ -256,6 +277,7 @@ public class GrimmEntity extends HostileEntity {
 		if (!world.getBlockState(pos.down()).isSolidBlock(world, pos.down())) return false;
 		int size = sizeOf(type);
 		int realm = realm(world.toServerWorld());
+		if (GrimmMcMain.spawnBlocked(world.toServerWorld(), realm, pos)) return false; // lit up, or near a crafting table, furnace, bed...
 		if (realm == 2) return false; // the End has only the mutants the spawner brings
 		if (realm == 1) return size < 2 || random.nextInt(4) != 0; // the Nether is always night, and mostly large ones
 		long time = world.toServerWorld().getTimeOfDay() % 24000L;
@@ -339,6 +361,14 @@ public class GrimmEntity extends HostileEntity {
 			if (t == null) return;
 			g.getLookControl().lookAt(t, 40f, 40f);
 			if (cooldown > 0) cooldown--;
+			if (g.age < g.staggerUntil) {
+				if (attackLeft > 0 && g.attackTicks() < 0) attackLeft = 0; // knocked out of the swing
+				if (attackLeft <= 0) {
+					g.getNavigation().stop();
+					cooldown = Math.max(cooldown, 6);
+					return;
+				}
+			}
 			// Smash whatever is in the way as it advances (a Grimm does not walk around walls).
 			int realm = g.realm();
 			if (attackLeft <= 0 && (g.age % ((g.kind.mutant() ? 4 : 7) + 2 * realm)) == 0 && g.getWorld() instanceof ServerWorld sw && g.getPos().squaredDistanceTo(lastPos) >= 0 && !g.inReach(t)) {

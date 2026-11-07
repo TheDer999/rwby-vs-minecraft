@@ -100,7 +100,7 @@ public class GrimmMcMain implements ModInitializer {
 			int z = net.minecraft.util.math.MathHelper.floor(player.getZ() + Math.sin(angle) * dist);
 			if (!world.isChunkLoaded(x >> 4, z >> 4)) continue;
 			net.minecraft.util.math.BlockPos pos = spotAt(world, realm, x, z, player.getBlockY());
-			if (pos == null) continue;
+			if (pos == null || (!force && spawnBlocked(world, realm, pos))) continue;
 			int y = pos.getY();
 			if (!world.getBlockState(pos.down()).isSolidBlock(world, pos.down()) || !world.getFluidState(pos).isEmpty()) continue;
 			GrimmEntity g = TYPES.get(kind.ordinal() * 3 + size).create(world, net.minecraft.entity.SpawnReason.NATURAL);
@@ -113,6 +113,52 @@ public class GrimmMcMain implements ModInitializer {
 			return true;
 		}
 		return false;
+	}
+
+	/**
+	 * Where no Grimm spawns by themselves: within 3 chunks (48 blocks) of a utility block, so a base with a crafting table, furnace or bed
+	 * is safe to come back to; and, in the Overworld, anywhere torches or other lights make the block light more than 7 (as for vanilla mobs).
+	 */
+	static boolean spawnBlocked(net.minecraft.server.world.ServerWorld world, int realm, net.minecraft.util.math.BlockPos pos) {
+		return (realm == 0 && world.getLightLevel(net.minecraft.world.LightType.BLOCK, pos) > 7) || nearUtility(world, pos);
+	}
+
+	/**
+	 * Whether a crafting table, furnace, blast furnace, smoker, smithing table, anvil, enchanting table or bed stands within 48 blocks
+	 * (3 chunks, 24 up or down): wide enough to cover where Grimm would spawn around someone standing at their base. Quick: a section of
+	 * a chunk is only searched block by block when its palette holds such a block.
+	 */
+	static boolean nearUtility(net.minecraft.server.world.ServerWorld world, net.minecraft.util.math.BlockPos pos) {
+		final int r = 48, ry = 24;
+		int minX = pos.getX() - r, maxX = pos.getX() + r, minZ = pos.getZ() - r, maxZ = pos.getZ() + r;
+		int minY = Math.max(world.getBottomY(), pos.getY() - ry), maxY = pos.getY() + ry;
+		for (int cx = minX >> 4; cx <= maxX >> 4; cx++) {
+			for (int cz = minZ >> 4; cz <= maxZ >> 4; cz++) {
+				net.minecraft.world.chunk.WorldChunk chunk = world.getChunkManager().getWorldChunk(cx, cz); // null when it is not loaded
+				if (chunk == null) continue;
+				net.minecraft.world.chunk.ChunkSection[] sections = chunk.getSectionArray();
+				for (int i = 0; i < sections.length; i++) {
+					int baseY = (chunk.getBottomSectionCoord() + i) << 4;
+					if (baseY + 15 < minY || baseY > maxY) continue;
+					net.minecraft.world.chunk.ChunkSection section = sections[i];
+					if (section.isEmpty() || !section.hasAny(GrimmMcMain::isUtility)) continue;
+					for (int x = Math.max(minX, cx << 4); x <= Math.min(maxX, (cx << 4) + 15); x++) {
+						for (int z = Math.max(minZ, cz << 4); z <= Math.min(maxZ, (cz << 4) + 15); z++) {
+							for (int y = Math.max(minY, baseY); y <= Math.min(maxY, baseY + 15); y++) {
+								if (isUtility(section.getBlockState(x & 15, y & 15, z & 15))) return true;
+							}
+						}
+					}
+				}
+			}
+		}
+		return false;
+	}
+
+	private static boolean isUtility(net.minecraft.block.BlockState s) {
+		return s.isOf(net.minecraft.block.Blocks.CRAFTING_TABLE) || s.isOf(net.minecraft.block.Blocks.FURNACE) || s.isOf(net.minecraft.block.Blocks.BLAST_FURNACE)
+			|| s.isOf(net.minecraft.block.Blocks.SMOKER) || s.isOf(net.minecraft.block.Blocks.SMITHING_TABLE) || s.isOf(net.minecraft.block.Blocks.ENCHANTING_TABLE)
+			|| s.isIn(net.minecraft.registry.tag.BlockTags.ANVIL) || s.isIn(net.minecraft.registry.tag.BlockTags.BEDS);
 	}
 
 	/**
@@ -168,7 +214,7 @@ public class GrimmMcMain implements ModInitializer {
 				int z = net.minecraft.util.math.MathHelper.floor(player.getZ() + Math.sin(angle) * dist);
 				if (!world.isChunkLoaded(x >> 4, z >> 4)) continue;
 				net.minecraft.util.math.BlockPos pos = spotAt(world, realm, x, z, player.getBlockY());
-				if (pos == null) continue;
+				if (pos == null || spawnBlocked(world, realm, pos)) continue;
 				int y = pos.getY();
 				if (!world.getBlockState(pos.down()).isSolidBlock(world, pos.down()) || !world.getFluidState(pos).isEmpty()) continue;
 				EntityType<GrimmEntity> type = TYPES.get(kind.ordinal() * 3 + size);
